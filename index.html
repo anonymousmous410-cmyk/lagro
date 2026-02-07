@@ -466,6 +466,30 @@
 			} catch (e) {}
 		}
 
+		// initialize hide-on-scroll header: hide when scrolling down, show when scrolling up
+		function initHeaderScroll() {
+			const hdr = document.querySelector('.getblack-header');
+			if (!hdr) return;
+			let lastY = window.scrollY || 0;
+			let ticking = false;
+			const threshold = 10;
+			window.addEventListener('scroll', () => {
+				const y = window.scrollY || 0;
+				if (!ticking) {
+					window.requestAnimationFrame(() => {
+						if (y - lastY > threshold && y > 50) {
+							hdr.classList.add('header-hidden');
+						} else if (lastY - y > threshold) {
+							hdr.classList.remove('header-hidden');
+						}
+						lastY = y;
+						ticking = false;
+					});
+					ticking = true;
+				}
+			}, { passive: true });
+		}
+
 		// enhance showView to adjust layout and scroll the revealed view into place
 		function showView(id) {
 			['view-subjects', 'view-lessons', 'view-content', 'view-profile'].forEach(v => { const el = document.getElementById(v); if (el) el.classList.add('hidden'); });
@@ -916,7 +940,7 @@
 			updateProfileUI();
 		}
 
-		document.addEventListener('DOMContentLoaded', () => { loadProfile(); renderSubjects(); });
+		document.addEventListener('DOMContentLoaded', () => { loadProfile(); renderSubjects(); initHeaderScroll(); adjustForHeader(); });
 	</script>
 
 </body>
