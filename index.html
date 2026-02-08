@@ -490,6 +490,8 @@
 			}, { passive: true });
 		}
 
+		// (header hide-on-scroll removed; using original header behavior)
+
 		// enhance showView to adjust layout and scroll the revealed view into place
 		function showView(id) {
 			['view-subjects', 'view-lessons', 'view-content', 'view-profile'].forEach(v => { const el = document.getElementById(v); if (el) el.classList.add('hidden'); });
@@ -604,6 +606,18 @@
 				const raw = localStorage.getItem('lagro_profile');
 				if (raw) profile = JSON.parse(raw);
 			} catch (e) { profile = { name: 'Guest User', email: '' }; }
+			// normalize older profile data formats
+			try {
+				if (profile && profile.studyEffectiveness != null) {
+					if (typeof profile.studyEffectiveness === 'number' && profile.studyEffectiveness <= 1) profile.studyEffectiveness = profile.studyEffectiveness * 100;
+				}
+				if (profile && profile.percentRecords) {
+					for (const k in profile.percentRecords) {
+						let v = profile.percentRecords[k];
+						if (typeof v === 'number' && v <= 1) profile.percentRecords[k] = Math.round(v * 100);
+					}
+				}
+			} catch(e) {}
 			updateProfileUI();
 		}
 
@@ -634,6 +648,25 @@
 					<button onclick="goHome()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Dashboard</button>
 				`;
 			}
+
+			// Add dark mode toggle to menu footer
+			const footer = document.createElement('div');
+			footer.className = 'p-3 border-t';
+			footer.innerHTML = `<div class="flex items-center justify-between text-sm"><div>Dark Mode</div><button id="dark-toggle" class="px-3 py-1 rounded bg-slate-100">Toggle</button></div>`;
+			menu.appendChild(footer);
+			const dt = footer.querySelector('#dark-toggle');
+			if (dt) {
+				// initialize label
+				dt.innerText = document.body.classList.contains('dark') ? 'On' : 'Off';
+				dt.setAttribute('aria-pressed', document.body.classList.contains('dark') ? 'true' : 'false');
+				dt.addEventListener('click', () => {
+					const isNowDark = document.body.classList.contains('dark');
+					// toggleDarkMode expects no arg to flip, but we want to flip and then reflect the new state
+					toggleDarkMode(!isNowDark);
+					dt.innerText = document.body.classList.contains('dark') ? 'On' : 'Off';
+					dt.setAttribute('aria-pressed', document.body.classList.contains('dark') ? 'true' : 'false');
+				});
+			}
 			// update GPA displays every time the menu changes
 			populateProfileDisplays();
 		}
@@ -659,7 +692,8 @@
 				listEl.innerHTML = html;
 			}
 			// show study effectiveness in menu/profile small badge if available
-			const eff = (profile && typeof profile.studyEffectiveness === 'number') ? profile.studyEffectiveness : null;
+			let eff = (profile && typeof profile.studyEffectiveness === 'number') ? profile.studyEffectiveness : null;
+			if (eff !== null && eff <= 1) eff = Math.round(eff * 100);
 			const effBadge = document.getElementById('profile-gpa-badge');
 			if (effBadge && eff !== null) {
 				const gtext = val !== null ? val.toFixed(2) : '—';
@@ -671,16 +705,7 @@
 		function showProfilePage() {
 			renderProfilePage();
 			showView('view-profile');
-			// Ensure the top 'BACK TO DASHBOARD' link is not hidden behind the header
-			try {
-				const vp = document.getElementById('view-profile');
-				const hdr = document.querySelector('header');
-				if (vp && hdr) {
-					vp.style.paddingTop = (hdr.offsetHeight + 12) + 'px';
-					// scroll the profile view to top so the back link is visible
-					vp.scrollTo({ top: 0, behavior: 'smooth' });
-				}
-			} catch (e) {}
+			// layout handled globally by showView()/adjustForHeader()
 			// update breadcrumbs: show Profile as current
 			document.getElementById('crumb-subject-sep').classList.remove('hidden');
 			const s = document.getElementById('crumb-subject'); s.classList.remove('hidden'); s.innerText = 'Profile';
@@ -767,7 +792,11 @@
 					const found = findLessonById(k);
 					return found ? escapeHtml(found.lesson.title) : escapeHtml(k);
 				});
-				const vals = keys.map(k => percRec[k]);
+				const vals = keys.map(k => {
+					let v = percRec[k];
+					if (typeof v === 'number' && v <= 1) v = Math.round(v * 100);
+					return v;
+				});
 				const bdata = { labels, datasets: [{ label: 'Percent', data: vals, backgroundColor: '#10b981' }] };
 				if (labels.length > 0) {
 					profileBarChart = new Chart(bar.getContext('2d'), { type: 'bar', data: bdata, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } } });
@@ -778,7 +807,9 @@
 				}
 			}
 			// Effectiveness progress bar
-			const effVal = (profile && typeof profile.studyEffectiveness === 'number') ? Math.round(profile.studyEffectiveness) : null;
+			let effVal = (profile && typeof profile.studyEffectiveness === 'number') ? profile.studyEffectiveness : null;
+			if (effVal !== null && effVal <= 1) effVal = Math.round(effVal * 100);
+			effVal = effVal !== null ? Math.round(effVal) : null;
 			const effBar = document.getElementById('effectiveness-bar');
 			const effLabel = document.getElementById('effectiveness-label');
 			if (effVal !== null && effBar && effLabel) {
@@ -789,24 +820,33 @@
 			// Recommendations: pick lowest-performing lessons (percent) or those below threshold
 			const recContainer = document.getElementById('profile-page-recommendations');
 			if (recContainer) {
-				const percRec = profile.percentRecords || {};
-				const items = Object.keys(percRec).map(k => ({ id: k, pct: percRec[k] }));
-				if (!items.length) { recContainer.innerHTML = '<em>No recommendations yet — take quizzes to get insights.</em>'; }
-				else {
-					// sort ascending (lowest first)
-					items.sort((a,b) => a.pct - b.pct);
-					// choose lessons below 75% or the 3 lowest
-					const threshold = 75;
-					const filtered = items.filter(x => x.pct < threshold);
-					const pick = (filtered.length ? filtered : items.slice(0, Math.min(3, items.length)));
-					let out = '<ul class="space-y-2">';
-					pick.forEach(it => {
-						const found = findLessonById(it.id);
-						const title = found ? escapeHtml(found.lesson.title) : escapeHtml(it.id);
-						out += `<li class="flex items-center justify-between"><div>${title} <span class="text-xs text-slate-400">(${Math.round(it.pct)}%)</span></div><div><button onclick="goToLessonFromProfile('${it.id}')" class="px-3 py-1 rounded bg-emerald-50 text-emerald-700 text-xs">Study</button></div></li>`;
-					});
-					out += '</ul>';
-					recContainer.innerHTML = out;
+				// Only show recommendations if overall GPA is below 3.0
+				const overallGpa = (profile && typeof profile.gpa === 'number') ? profile.gpa : null;
+				if (overallGpa !== null && overallGpa >= 3.0) {
+					// clear recommendations when GPA is satisfactory
+					recContainer.innerHTML = '';
+				} else {
+					const percRec = profile.percentRecords || {};
+					const items = Object.keys(percRec).map(k => ({ id: k, pct: percRec[k] }));
+					if (!items.length) { recContainer.innerHTML = '<em>No recommendations yet — take quizzes to get insights.</em>'; }
+					else {
+						// normalize percent values (handle 0..1 stored as fraction)
+						items.forEach(it => { if (typeof it.pct === 'number' && it.pct <= 1) it.pct = Math.round(it.pct * 100); });
+						// sort ascending (lowest first)
+						items.sort((a,b) => a.pct - b.pct);
+						// choose lessons below 75% or the 3 lowest
+						const threshold = 75;
+						const filtered = items.filter(x => x.pct < threshold);
+						const pick = (filtered.length ? filtered : items.slice(0, Math.min(3, items.length)));
+						let out = '<ul class="space-y-2">';
+						pick.forEach(it => {
+							const found = findLessonById(it.id);
+							const title = found ? escapeHtml(found.lesson.title) : escapeHtml(it.id);
+							out += `<li class="flex items-center justify-between"><div>${title} <span class="text-xs text-slate-400">(${Math.round(it.pct)}%)</span></div><div><button onclick="goToLessonFromProfile('${it.id}')" class="px-3 py-1 rounded bg-emerald-50 text-emerald-700 text-xs">Study</button></div></li>`;
+						});
+						out += '</ul>';
+						recContainer.innerHTML = out;
+					}
 				}
 			}
 		}
@@ -890,6 +930,20 @@
 			updateProfileUI();
 		}
 
+		// Dark mode support
+		function toggleDarkMode(enable) {
+			if (typeof enable === 'boolean') {
+				document.body.classList.toggle('dark', enable);
+				localStorage.setItem('lagro_dark', enable ? '1' : '0');
+				return;
+			}
+			const isDark = document.body.classList.toggle('dark');
+			localStorage.setItem('lagro_dark', isDark ? '1' : '0');
+		}
+
+		// initialize dark mode from storage
+		try { if (localStorage.getItem('lagro_dark') === '1') document.body.classList.add('dark'); } catch(e) {}
+
 		window.checkAnswer = function(btn, isCorrect) {
 			const p = btn.parentElement; const f = p.parentElement.querySelector('.feedback');
 			Array.from(p.children).forEach(b => { b.disabled = true; b.classList.add('opacity-40'); });
@@ -930,6 +984,14 @@
 			if (!profile.percentRecords) profile.percentRecords = {};
 			profile.gpaRecords[lessonId] = lessonGpa;
 			if (typeof percent === 'number') profile.percentRecords[lessonId] = percent;
+			// normalize stored percent (allow both 0..1 and 0..100 inputs)
+			try {
+				if (profile.percentRecords && typeof profile.percentRecords[lessonId] === 'number') {
+					let pv = profile.percentRecords[lessonId];
+					if (pv <= 1) pv = Math.round(pv * 100);
+					profile.percentRecords[lessonId] = pv;
+				}
+			} catch (e) {}
 			const gvals = Object.values(profile.gpaRecords || {});
 			const gavg = gvals.reduce((s, v) => s + v, 0) / (gvals.length || 1);
 			profile.gpa = gavg;
