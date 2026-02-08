@@ -28,7 +28,6 @@
 /* Profile page scroll area now uses page-level scrolling */
 #view-profile .profile-scroll { padding-right: 0.5rem; }
 
-/* GetBlack header design (applied to Lagro header content) */
 .getblack-header {
 	border: 1px solid transparent;
 	padding: 2px 12px;
@@ -89,3 +88,23 @@ body { padding-top: 1rem; }
 }
 
 .gpa-badge small { font-weight: 600; color: #f0fff8; }
+
+/* Header hide/show on scroll */
+/* Allow header to hide on scroll while keeping the original absolute layout */
+.getblack-header { transition: transform 0.24s ease, opacity: 0.24s ease; will-change: transform; }
+.getblack-header.header-hidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+
+/* Dark mode adjustments (basic) */
+body.dark { background: #0b1220; color: #d1d5db; }
+body.dark header.getblack-header { background-color: #06221a; border-color: rgba(255,255,255,0.03); }
+body.dark .bg-white { background-color: #0f1724 !important; color: #d1d5db !important; border-color: rgba(255,255,255,0.04) !important; }
+body.dark .text-slate-500 { color: #9ca3af !important; }
+body.dark .text-lagro-green { color: #7ee3b8 !important; }
+body.dark .bg-emerald-50 { background-color: rgba(16,185,129,0.06) !important; }
+body.dark .gpa-badge { background: rgba(8,120,85,0.12); }
+body.dark .lesson-content p, body.dark .lesson-content li { color: #cbd5e1; }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.getblack-header { transition: none; }
+}
