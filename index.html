@@ -31,6 +31,63 @@
 		</script>
 
 		<link rel="stylesheet" href="lagro.css">
+		<style>
+			/* Flashcard box styling to match provided design */
+			/* outer wrapper should simply position the boxed card; actual box styling moved to .flashcard-container */
+			#flashcard-card {
+				padding: 0;
+				background: transparent;
+				border: none;
+				box-shadow: none;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 220px;
+				transition: transform .12s ease;
+			}
+			#flashcard-card:active { transform: translateY(1px); }
+			#fc-label { text-transform: uppercase; color: #94a3b8; letter-spacing: .12em; font-size: .75rem; }
+			#fc-front { color: #0f172a; font-weight: 700; font-size: 1.5rem; }
+			#fc-back { color: #475569; font-size: 1rem; }
+			#fc-prev, #fc-next { width:44px; height:44px; border-radius:9999px; border:1px solid #eef2f6; background:#fff; display:flex; align-items:center; justify-content:center; box-shadow: 0 6px 20px rgba(2,6,23,0.06); cursor:pointer; }
+			#fc-prev:hover, #fc-next:hover { transform: translateY(-2px); }
+			#fc-index { background:#eef2f6; padding:8px 12px; border-radius:8px; color:#475569; font-weight:600; }
+			/* small responsive tweak */
+			@media (min-width: 640px) {
+				#flashcard-card { min-height: 220px; }
+			}
+			/* sized like the example: fixed card box */
+			.flashcard-container { perspective: 1000px; width: 100%; max-width: 450px; height: 320px; margin: 0 auto; cursor: pointer; border-radius: 18px; box-shadow: 0 20px 40px rgba(2,6,23,0.06); border: 1px solid #e6eef6; background: #ffffff; display:flex; align-items:center; justify-content:center; }
+			.flashcard-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+			.flashcard-inner.is-flipped { transform: rotateY(180deg); }
+			/* Front and back faces share identical background/border/shadow so flip looks seamless.
+			   Faces are slightly inset so the container background is visible whether flipped or not. */
+			.flashcard-front, .flashcard-back {
+				position: absolute;
+				left: 10px;
+				top: 10px;
+				width: calc(100% - 20px);
+				height: calc(100% - 20px);
+				-webkit-backface-visibility: hidden; backface-visibility: hidden;
+				display: flex; flex-direction: column; align-items: center; justify-content: center;
+				padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08);
+				border: 2px solid #e2e8f0; background-color: #ffffff; color: #0f172a;
+			}
+			.flashcard-back { transform: rotateY(180deg); }
+			/* control buttons */
+			.fc-action { background:#fff; border:1px solid #eef2f6; padding:8px 10px; border-radius:8px; cursor:pointer; box-shadow: 0 6px 20px rgba(2,6,23,0.04); }
+			.fc-action:hover { transform: translateY(-2px); }
+			.fc-saved { color: #f59e0b; }
+			/* Dark mode: stronger overrides so Tailwind utility classes do not leave white card backgrounds */
+			body.dark #flashcard-card { background: transparent !important; }
+			body.dark .flashcard-container { background: #071024 !important; border-color: rgba(255,255,255,0.06) !important; box-shadow: 0 20px 40px rgba(2,6,23,0.6) !important; }
+			body.dark .flashcard-inner { color: #e6eef8 !important; }
+			/* In dark mode both faces use the same background and border so flip stays consistent */
+			body.dark .flashcard-front, body.dark .flashcard-back { background-color: #072033 !important; border-color: rgba(255,255,255,0.04) !important; color: #dbeafe !important; }
+			body.dark #card-front-text, body.dark #card-back-text { color: #dbeafe !important; }
+			body.dark #fc-prev, body.dark #fc-next, body.dark .fc-action { background:#071426 !important; border:1px solid rgba(255,255,255,0.06) !important; color:#e6eef8 !important; box-shadow: 0 6px 20px rgba(2,6,23,0.6) !important; }
+			body.dark .fc-action:hover { transform: translateY(-2px); }
+		</style>
         
 		<!-- tailwind config moved to lagro-tailwind-config.js -->
 	</head>
@@ -88,15 +145,52 @@
 			</div>
 
 			<div class="flex space-x-1 bg-emerald-50 p-1.5 rounded-xl mb-6 w-full max-w-md mx-auto flex-none shadow-inner">
-				<button onclick="switchTab('read')" id="tab-read" class="flex-1 py-2 text-sm font-bold rounded-lg shadow-sm bg-white text-lagro-green transition">📖 READ</button>
-				<button onclick="switchTab('visuals')" id="tab-visuals" class="flex-1 py-2 text-sm font-bold rounded-lg text-emerald-700 hover:bg-white/50 transition">📊 CHARTS</button>
-				<button onclick="switchTab('quiz')" id="tab-quiz" class="flex-1 py-2 text-sm font-bold rounded-lg text-emerald-700 hover:bg-white/50 transition">🧠 QUIZ (10)</button>
+				<button onclick="switchTab('read')" id="tab-read" class="flex-1 py-2 text-sm font-bold rounded-lg shadow-sm bg-white text-lagro-green transition">READ</button>
+				<button onclick="switchTab('visuals')" id="tab-visuals" class="flex-1 py-2 text-sm font-bold rounded-lg text-emerald-700 hover:bg-white/50 transition">CHARTS</button>
+				<button onclick="switchTab('quiz')" id="tab-quiz" class="flex-1 py-2 text-sm font-bold rounded-lg text-emerald-700 hover:bg-white/50 transition">QUIZ</button>
+				<button onclick="switchTab('flashcards')" id="tab-flashcards" class="flex-1 py-2 text-sm font-bold rounded-lg text-emerald-700 hover:bg-white/50 transition">FLASHCARDS</button>
 			</div>
 
 			<div class="flex-grow bg-white rounded-2xl shadow-xl border border-emerald-100 p-6 sm:p-10 relative mb-4">
 				<div id="content-read" class="lesson-content"></div>
 				<div id="content-visuals" class="hidden h-full flex flex-col items-center justify-center space-y-8"></div>
 				<div id="content-quiz" class="hidden"><div id="quiz-wrapper" class="max-w-2xl mx-auto"></div></div>
+				<div id="content-flashcards" class="hidden">
+					<div id="flashcards-wrapper" class="max-w-3xl mx-auto p-6 bg-emerald-50 rounded-lg overflow-hidden">
+						<div class="flex items-center justify-between mb-6">
+							<h3 class="font-bold text-lagro-green">Flashcards</h3>
+							<div class="text-sm text-slate-600">Click the card to reveal the answer</div>
+						</div>
+
+						<div id="flashcard-stage" class="flex flex-col items-center">
+							<div id="flashcard-card" class="w-full sm:w-3/4 bg-white rounded-2xl shadow-lg border border-emerald-100 p-10 text-center cursor-pointer select-none" style="min-height:160px;">
+								<div class="flashcard-container" id="flashcard-container">
+									<div class="flashcard-inner" id="flashcard-inner">
+										<div class="flashcard-front">
+											<span class="text-xs uppercase tracking-widest text-slate-400 mb-6 font-black">Question</span>
+											<h4 id="card-front-text" class="text-2xl font-semibold text-lagro-green">Front</h4>
+										</div>
+										<div class="flashcard-back">
+											<span class="text-xs uppercase tracking-widest text-slate-400 mb-6 font-black">Answer</span>
+											<p id="card-back-text" class="text-sm text-slate-600">Back</p>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="flex items-center gap-4 mt-6">
+								<button id="fc-prev" class="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center">‹</button>
+								<div id="card-counter" class="px-4 py-2 bg-white rounded text-slate-600">0 / 0</div>
+								<button id="fc-next" class="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center">›</button>
+								<div class="flex items-center gap-2 ml-3">
+									<button id="fc-shuffle" class="fc-action">Shuffle</button>
+								</div>
+							</div>
+
+							<div class="text-xs text-slate-500 mt-3">Click card to reveal answer • Use arrows to navigate</div>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -440,10 +534,180 @@
 								{ q: "What would happen to Earth without the natural greenhouse effect?", options: ["It would be too hot","It would lose gravity","It would be too cold for life","The oceans would evaporate"], a: 2 }
 							]
 						}
+						},
+					{
+						id: "S2",
+						week: "Week 2",
+						title: "Week 2: Greenhouse Effect & Earth's Temperature",
+						desc: "How the atmosphere acts as a natural blanket and the impact of human enhancement.",
+						content: {
+							read: `
+							<div class="objective-box">
+								<h4 class="font-bold text-lagro-green">Week 2 Objectives</h4>
+								<ul>
+									<li>Define the natural greenhouse effect.</li>
+									<li>Identify major greenhouse gases (GHGs).</li>
+									<li>Understand the "Blanket Analogy".</li>
+									<li>Distinguish between Natural and Human-Enhanced effects.</li>
+								</ul>
+							</div>
+
+							<h2>Overview</h2>
+							<p>The greenhouse effect is a <strong>natural process</strong> where specific atmospheric gases trap heat. It regulates Earth's average temperature, keeping it from being a frozen wasteland.</p>
+
+							<h3>Key Greenhouse Gases (GHGs)</h3>
+							<ul>
+								<li><strong>Carbon Dioxide ($CO_2$):</strong> Emitted by burning fossil fuels and deforestation. Most abundant human emission.</li>
+								<li><strong>Methane ($CH_4$):</strong> From livestock, landfills, and wetlands. Traps more heat than $CO_2$.</li>
+								<li><strong>Nitrous Oxide ($N_2O$):</strong> From fertilizers and industrial processes.</li>
+								<li><strong>Water Vapor:</strong> The most abundant natural GHG; amplifies warming.</li>
+								<li><strong>Fluorinated Gases:</strong> Synthetic chemicals (CFCs/HFCs) used in refrigerants.</li>
+							</ul>
+
+							<h3>The "Blanket Analogy"</h3>
+							<p>The atmosphere acts like a blanket. It lets sunlight (Solar Radiation) in but traps the heat (Infrared Radiation) trying to escape. If the blanket is too thin, Earth freezes. If it's too thick (Human-Enhanced), Earth over-warms.</p>
+
+							<h3>Important Vocabulary</h3>
+							<div class="vocab-item"><strong>Solar Radiation:</strong> Energy coming from the sun.</div>
+							<div class="vocab-item"><strong>Absorb:</strong> To soak up energy.</div>
+							<div class="vocab-item"><strong>Reflect:</strong> To bounce off without soaking up.</div>
+							<div class="vocab-item"><strong>Re-emit:</strong> To send energy back out after absorbing it.</div>
+						`,
+							chart: {
+								type: 'bar',
+								labels: ['CO2', 'Methane', 'Nitrous Oxide', 'F-Gases'],
+								data: [1, 28, 265, 12000],
+								desc: "While CO2 is most abundant, gases like Methane and F-Gases have a much higher 'Global Warming Potential' per molecule."
+							},
+							quiz: [
+								{ q: "The greenhouse effect is primarily a ______ process.", options: ["Harmful", "Natural", "Artificial", "Dangerous"], a: 1 },
+								{ q: "Which gas is considered the most abundant 'natural' greenhouse gas?", options: ["Oxygen", "Carbon Dioxide", "Water Vapor", "Argon"], a: 2 },
+								{ q: "What analogy is used to describe how the atmosphere keeps Earth warm?", options: ["The Sponge Analogy", "The Blanket Analogy", "The Mirror Analogy", "The Filter Analogy"], a: 1 },
+								{ q: "Methane ($CH_4$) is mainly emitted from which source?", options: ["Deforestation", "Livestock and Landfills", "Aerosol Cans", "Oceans"], a: 1 },
+								{ q: "Burning fossil fuels primarily increases which gas?", options: ["Nitrogen", "Oxygen", "Carbon Dioxide", "Neon"], a: 2 },
+								{ q: "Energy coming from the sun is called:", options: ["Infrared Radiation", "Solar Radiation", "Thermal Energy", "Microwaves"], a: 1 },
+								{ q: "What happens to Earth's temperature if the 'blanket' of GHGs becomes too thick?", options: ["It cools down", "It stays the same", "It increases (over-warms)", "It loses its atmosphere"], a: 2 },
+								{ q: "Which of these is a synthetic, powerful heat-trapper used in refrigerants?", options: ["Water Vapor", "Fluorinated Gases", "Methane", "Ozone"], a: 1 },
+								{ q: "To 'bounce off a surface without being soaked up' is to:", options: ["Absorb", "Reflect", "Re-emit", "Conduct"], a: 1 },
+								{ q: "Nitrous Oxide ($N_2O$) primarily results from:", options: ["Volcanoes", "Fertilizers", "Respiration", "Lightning"], a: 1 },
+								{ q: "Which gas traps significantly more heat per molecule than $CO_2$?", options: ["Oxygen", "Nitrogen", "Methane", "Hydrogen"], a: 2 },
+								{ q: "The term for taking in or soaking up energy is:", options: ["Reflect", "Absorb", "Radiate", "Emit"], a: 1 },
+								{ q: "The 'Human-Enhanced' greenhouse effect leads to:", options: ["Ice Ages", "Global Warming", "Atmospheric Loss", "More Oxygen"], a: 1 },
+								{ q: "Ground-level Ozone is formed by:", options: ["Plants", "Vehicle and Industrial emissions", "Sea spray", "Meteors"], a: 1 },
+								{ q: "If Earth lacked a greenhouse effect completely, it would be:", options: ["Exactly the same", "Extremely hot", "Vastly colder", "Full of life"], a: 2 },
+								{ q: "Infrared radiation is another term for:", options: ["Visible light", "Heat", "UV rays", "X-rays"], a: 1 },
+								{ q: "Which gas is a pollutant at ground level but traps heat?", options: ["Nitrogen", "Argon", "Ozone", "Helium"], a: 2 },
+								{ q: "Deforestation contributes to the increase of:", options: ["Methane", "Nitrous Oxide", "Carbon Dioxide", "Water Vapor"], a: 2 },
+								{ q: "To send energy back out after it has been absorbed is to:", options: ["Reflect", "Re-emit", "Sublime", "Condense"], a: 1 },
+								{ q: "Earth's 'Goldilocks Zone' status is maintained by the balance of:", options: ["Distance and Atmosphere", "The Moon and Stars", "Oceans and Fish", "Wind and Rain"], a: 0 }
+							]
 						}
-					]
-				}
-			};
+					}
+				]
+			},
+
+			"physics": {
+				id: "physics",
+				title: "Physics",
+				icon: "⚛️",
+				color: "bg-blue-50 text-blue-900 border-blue-200",
+				desc: "Mechanics, thermodynamics, and the laws that govern energy and matter.",
+				lessons: [
+					{
+						id: "P1",
+						title: "Lesson 1: Heat and Thermodynamics",
+						desc: "Complete study notes on the Foundations of Thermodynamics and Heat Transfer.",
+						content: {
+							read: `
+							<div class="objective-box">
+								<h4 class="font-bold text-blue-900">Foundations of Thermodynamics</h4>
+								<p>Thermodynamics is the branch of physics that deals with heat, work, and temperature, and their relation to energy and radiation.</p>
+							</div>
+
+							<h2>The Zeroth Law of Thermodynamics</h2>
+							<p><strong>Definition:</strong> If two systems (A and B) are each in thermal equilibrium with a third system (C), then they are in thermal equilibrium with each other.</p>
+							<p><strong>Key Concept:</strong> This law defines the concept of <strong>temperature</strong>. When systems are in thermal equilibrium, they share the same temperature, and no net heat flows between them.</p>
+
+							<h2>What is Temperature?</h2>
+							<p><strong>Definition:</strong> A measure of the <strong>average kinetic energy</strong> of particles in a substance. It indicates how fast molecules are moving on average.</p>
+							<div class="vocab-item">
+								<strong>Important Distinction:</strong> A higher temperature does not necessarily mean a substance has more total heat energy (which also depends on mass and material).
+							</div>
+							<h3>Common Units:</h3>
+							<ul>
+								<li><strong>Celsius (°C):</strong> Used globally in most countries.</li>
+								<li><strong>Kelvin (K):</strong> The SI unit used for scientific work.</li>
+								<li><strong>Fahrenheit (°F):</strong> Used primarily in the United States.</li>
+							</ul>
+
+							<h2>What is Heat?</h2>
+							<p><strong>Definition:</strong> Heat is <strong>energy in transit</strong>. It is the energy transferred between objects or systems due to a temperature difference.</p>
+							<ul>
+								<li><strong>Flow Direction:</strong> Heat always flows spontaneously from regions of higher temperature to regions of lower temperature.</li>
+								<li><strong>Measurement:</strong> Measured in Joules (J) or calories.</li>
+								<li><strong>Equilibrium:</strong> Heat flow continues until thermal equilibrium is reached (temperatures are equal).</li>
+							</ul>
+
+							<h2>Methods of Heat Transfer</h2>
+                            
+							<h3>1. Conduction</h3>
+							<div class="vocab-item">
+								<strong>Mechanism:</strong> Heat transfer through direct contact or the movement of electrons within a substance.<br>
+								<strong>Medium:</strong> Requires a medium; occurs mainly in solids.<br>
+								<strong>Speed:</strong> Generally the slowest method of heat transfer.
+							</div>
+
+							<h3>2. Convection</h3>
+							<div class="vocab-item">
+								<strong>Mechanism:</strong> Heat transfer by the actual movement of fluids (liquids or gases).<br>
+								<strong>Process:</strong>
+								<ul class="mt-2">
+									<li>Fluid near a heat source warms and expands.</li>
+									<li>The warm fluid becomes less dense and rises.</li>
+									<li>Cooler, denser fluid moves in to replace it.</li>
+									<li>This creates a continuous cycle called a <strong>convection current</strong>.</li>
+								</ul>
+								<strong>Examples:</strong> Boiling water, ocean currents, weather patterns, and home heating systems.<br>
+								<strong>Speed:</strong> Faster than conduction; categorized as medium speed.
+							</div>
+
+							<h3>3. Radiation</h3>
+							<div class="vocab-item">
+								<strong>Mechanism:</strong> Heat transfer by <strong>electromagnetic waves</strong>.<br>
+								<strong>Medium:</strong> Does not require a medium; it can travel through the vacuum of space and through transparent materials.<br>
+								<strong>Key Property:</strong> Every object emits thermal radiation based on its temperature.<br>
+								<strong>Speed:</strong> The fastest method, traveling at the speed of light ($3 \times 10^8 \text{ m/s}$).<br>
+								<strong>Examples:</strong> Sunlight warming the Earth, heat from a campfire, and infrared heaters.
+							</div>
+						`,
+							chart: { type: 'bar', labels: ['Conduction', 'Convection', 'Radiation'], data: [1,5,100], label: 'Methods of Heat Transfer Speed', desc: 'Relative comparison: Radiation is instantaneous (speed of light), Convection is medium (fluid flow), and Conduction is slowest (vibration transfer).' },
+							quiz: [
+								{ q: "Which law defines the concept of temperature?", options: ["First Law", "Second Law", "Zeroth Law", "Third Law"], a: 2 },
+								{ q: "If system A and B are in equilibrium with C, they are in equilibrium with each other. This is:", options: ["Newton's Law", "Zeroth Law", "Law of Cooling", "Convection"], a: 1 },
+								{ q: "Temperature measures the ______ kinetic energy of particles.", options: ["Total", "Minimum", "Average", "Potential"], a: 2 },
+								{ q: "Which temperature unit is considered the SI unit?", options: ["Celsius", "Kelvin", "Fahrenheit", "Rankine"], a: 1 },
+								{ q: "Heat is defined as energy in ______.", options: ["Storage", "Transit", "Solid form", "Equilibrium"], a: 1 },
+								{ q: "Spontaneous heat flow occurs from:", options: ["Low to High Temp", "High to Low Temp", "Inside to Outside only", "Cold to Warm"], a: 1 },
+								{ q: "Heat transfer through direct contact is called:", options: ["Radiation", "Convection", "Conduction", "Induction"], a: 2 },
+								{ q: "Conduction occurs mainly in which state of matter?", options: ["Gases", "Liquids", "Solids", "Plasma"], a: 2 },
+								{ q: "Which method involve the movement of liquids or gases?", options: ["Conduction", "Radiation", "Convection", "Friction"], a: 2 },
+								{ q: "What is created when warm fluid rises and cool fluid sinks?", options: ["Radiation wave", "Convection current", "Conductive path", "Vacuum"], a: 1 },
+								{ q: "Boiling water is a primary example of:", options: ["Radiation", "Convection", "Conduction", "Equilibrium"], a: 1 },
+								{ q: "Heat transfer via electromagnetic waves is:", options: ["Convection", "Conduction", "Radiation", "Expansion"], a: 2 },
+								{ q: "Which method can travel through the vacuum of space?", options: ["Convection", "Conduction", "Radiation", "All of them"], a: 2 },
+								{ q: "Thermal radiation travels at what speed?", options: ["Speed of sound", "1,000 m/s", "Speed of light", "Varies greatly"], a: 2 },
+								{ q: "Generally, the slowest method of heat transfer is:", options: ["Radiation", "Convection", "Conduction", "They are equal"], a: 2 },
+								{ q: "When temperatures are equal and no net heat flows, the systems are in:", options: ["Thermal Stasis", "Thermal Equilibrium", "Thermal Zero", "Isotope"], a: 1 },
+								{ q: "Units for heat energy are Joules or ______.", options: ["Newtons", "Calories", "Watts", "Amps"], a: 1 },
+								{ q: "Why does warm fluid rise?", options: ["It becomes more dense", "It becomes less dense", "Gravity pushes it up", "It turns into gas"], a: 1 },
+								{ q: "Sunlight warming the Earth is an example of:", options: ["Conduction", "Convection", "Radiation", "Direct Contact"], a: 2 },
+								{ q: "True or False: Higher temperature always means more total heat energy.", options: ["True", "False"], a: 1 }
+							]
+						}
+					}
+				]
+			}
+		};
 
 		let currentSubject = null, currentLesson = null, currentChart = null;
 		let currentQuizState = null;
@@ -543,12 +807,15 @@
 		}
 
 		function switchTab(t) {
-			['read', 'visuals', 'quiz'].forEach(tab => {
-				document.getElementById(`tab-${tab}`).classList.toggle('bg-white', tab === t);
-				document.getElementById(`tab-${tab}`).classList.toggle('text-lagro-green', tab === t);
-				document.getElementById(`content-${tab}`).classList.toggle('hidden', tab !== t);
+			['read', 'visuals', 'quiz', 'flashcards'].forEach(tab => {
+				const btn = document.getElementById(`tab-${tab}`);
+				if (btn) btn.classList.toggle('bg-white', tab === t);
+				if (btn) btn.classList.toggle('text-lagro-green', tab === t);
+				const content = document.getElementById(`content-${tab}`);
+				if (content) content.classList.toggle('hidden', tab !== t);
 			});
 			if (t === 'visuals') renderVisuals();
+			if (t === 'flashcards') renderFlashcards();
 		}
 
 		function renderVisuals() {
@@ -596,6 +863,237 @@
 			});
 			// result area
 			const res = document.createElement('div'); res.id = 'quiz-result'; res.className = 'mt-6 text-center text-sm text-slate-600'; w.appendChild(res);
+		}
+
+		// Build simple flashcards from the lesson read content.
+		// Preset flashcards for specific lessons (overrides generated cards)
+		const presetFlashcards = {
+			"s1": [
+				{ front: "Goldilocks Zone", back: "The habitable region around a star where temperature allows liquid water to exist." },
+				{ front: "Venus", back: "The hottest planet due to its thick greenhouse-gas-rich atmosphere." },
+				{ front: "Magnetic Field", back: "Protects Earth from harmful solar radiation and maintains our atmosphere." },
+				{ front: "71%", back: "The percentage of Earth's surface covered by liquid water." },
+				{ front: "Ozone Layer", back: "The part of the stratosphere that blocks harmful Ultraviolet (UV) radiation." },
+				{ front: "Terrestrial Planets", back: "Mercury, Venus, Earth, and Mars; known for being rocky and solid." },
+				{ front: "Gas Giants", back: "Jupiter and Saturn; massive planets made mostly of hydrogen and helium." },
+				{ front: "Ice Giants", back: "Uranus and Neptune; planets containing heavier elements like oxygen, carbon, and nitrogen." },
+				{ front: "Uranus", back: "The coldest planet in our solar system." },
+				{ front: "Jupiter", back: "The largest planet, famous for its 'Great Red Spot' storm." },
+				{ front: "Mars", back: "Known as the 'Red Planet' due to iron oxide (rust) on its surface." },
+				{ front: "Mercury", back: "The smallest and closest planet to the Sun; has almost no atmosphere." },
+				{ front: "Nitrogen (78%)", back: "The most abundant gas in Earth's atmosphere." },
+				{ front: "Greenhouse Effect", back: "Natural process where gases like $CO_2$ trap heat to keep Earth habitable." },
+				{ front: "Plate Tectonics", back: "Geological activity that recycles nutrients and carbon, stabilizing the climate." },
+				{ front: "Oxygen (21%)", back: "The second most common gas on Earth, vital for complex life." },
+				{ front: "Atmospheric Pressure", back: "Force exerted by the atmosphere that prevents water from boiling away or freezing." },
+				{ front: "Saturn", back: "Known for its extensive and bright ring system made of ice and rock." },
+				{ front: "Carbon Dioxide", back: "The gas primarily responsible for Venus's extreme runaway greenhouse effect." },
+				{ front: "Core Rotation", back: "The movement of Earth's molten outer core that generates our magnetic field." }
+			],
+			"S2": [
+				{ front: "Is the Greenhouse Effect naturally bad?", back: "No, it is essential for life to regulate temperature." },
+				{ front: "What does the 'Blanket Analogy' explain?", back: "How the atmosphere lets sunlight in but traps heat to keep Earth warm." },
+				{ front: "Which gas is the most abundant natural GHG?", back: "Water Vapor." },
+				{ front: "Primary source of human-emitted Carbon Dioxide?", back: "Burning fossil fuels and deforestation." },
+				{ front: "What does $CH_4$ stand for?", back: "Methane." },
+				{ front: "Which GHG is emitted from livestock and landfills?", back: "Methane." },
+				{ front: "What are synthetic GHGs used in refrigerants called?", back: "Fluorinated Gases (CFCs/HFCs)." },
+				{ front: "Define 'Re-emit'.", back: "To send energy back out after it has been absorbed." },
+				{ front: "Main consequence of human-enhanced greenhouse effect?", back: "Global warming and climate change." },
+				{ front: "What happens if Earth has no 'blanket'?", back: "It would be too cold for life to exist." },
+				{ front: "Potent gas resulting from fertilizers?", back: "Nitrous Oxide ($N_2O$)." },
+				{ front: "Define 'Absorb'.", back: "To take in or soak up energy." },
+				{ front: "What is Solar Radiation?", back: "Energy or sunlight coming from the sun." },
+				{ front: "What is 'Ground-level Ozone'?", back: "A pollutant from vehicle/industrial emissions that also traps heat." },
+				{ front: "Difference between Reflect and Absorb?", back: "Reflect bounces off; Absorb soaks in." },
+				{ front: "What is a 'Feedback Loop' in warming?", back: "When a process (like water vapor increase) amplifies the initial warming." },
+				{ front: "What happens when the 'blanket' becomes too thick?", back: "The planet over-warms (Global Warming)." },
+				{ front: "Where does Nitrous Oxide come from?", back: "Fertilizers and industrial processes." },
+				{ front: "Most abundant human-emitted GHG?", back: "Carbon Dioxide ($CO_2$)." },
+				{ front: "Natural vs Enhanced effect?", back: "Natural maintains balance; Enhanced traps too much heat." }
+			],
+			"l1": [
+				{ front: "Associate Degree", back: "A 2-year undergraduate program usually taken at a community or technical college." },
+				{ front: "Bachelor’s Degree", back: "A 3-4 year university degree focused on a specific academic major." },
+				{ front: "Master’s Degree", back: "A graduate level program taken 1-2 years after completing a Bachelor's." },
+				{ front: "Doctoral Degree", back: "The highest academic level, taking 3-7 years and focused on original research." },
+				{ front: "Accelerated Programs", back: "Faster completion routes (e.g., 3-year bachelor's) often using year-round study." },
+				{ front: "Apprenticeships", back: "Work-based learning combined with classroom instruction in skilled trades." },
+				{ front: "Traineeships", back: "Work-based learning similar to apprenticeships, but usually shorter and less technical." },
+				{ front: "Foundation Year", back: "A one-year program to prepare students for undergraduate study." },
+				{ front: "Bridging Courses", back: "Short programs to help students meet specific academic prerequisites for a course." },
+				{ front: "2+2 Program", back: "A transfer path: 2 years for an associate degree + 2 years at a university for a bachelor's." },
+				{ front: "Articulation Agreement", back: "Formal partnerships between schools that simplify the credit transfer process." },
+				{ front: "MOOCs", back: "Massive Open Online Courses; large-scale, often free online learning." },
+				{ front: "Microcredentials", back: "Targeted, short-term learning focused on a specific practical skill." },
+				{ front: "Blended Learning", back: "An educational approach combining online digital media with traditional classroom methods." },
+				{ front: "Pre-Professional Programs", back: "Tracks specifically designed to prepare students for careers like medicine or law." }
+			],
+			"l2": [
+				{ front: "What does a 'Whole Person' lens consider in career development?", back: "Skills, interests, values, personality, life circumstances, and cultural background." },
+				{ front: "True or False: Career pathways are linear and follow a straight line.", back: "False. Pathways are non-linear and subject to change." },
+				{ front: "Which influence is recognized as the 'most significant' factor in career choice?", back: "Parental Influence." },
+				{ front: "How do TikTok and YouTube trends (vloggers, K-pop) affect career choice?", back: "Through Peer/Media Exposure that shapes dreams and aspirations." },
+				{ front: "What is the primary driver for students choosing TESDA NC over 4-year degrees?", back: "Financial Constraints (seeking quicker routes to the workforce)." },
+				{ front: "How do societal 'Gender Roles' influence career paths for females?", back: "They often push females toward teaching or caregiving roles." },
+				{ front: "How do societal 'Gender Roles' influence career paths for males?", back: "They often push males toward engineering or technical roles." },
+				{ front: "What happens when Interest/Aptitude conflicts with Parental Pressure?", back: "Interest is central, but external pressures can override it (e.g., Medicine vs IT)." },
+				{ front: "What is the core focus of Academic pathways?", back: "Theoretical and research-based learning." },
+				{ front: "What is the core focus of Vocational pathways?", back: "Practical, hands-on, skills-based learning." }
+			],
+			"l3": [
+				{ front: "What three things define the 'nature' of an employment type?", back: "Work hours, duration, and the worker-employer relationship." },
+				{ front: "Which employment type is considered permanent and offers job security?", back: "Full-Time employment." },
+				{ front: "How are Part-Time workers typically paid?", back: "They are typically paid an hourly wage with limited or no benefits." },
+				{ front: "What is the main drawback of 'Casual' employment?", back: "It provides no job security or paid leave." },
+				{ front: "When does 'Seasonal' employment end?", back: "It ends when the specific season it was hired for is over." },
+				{ front: "In 'Gig' work, what is the legal status of the worker?", back: "They are an independent contractor, not a traditional employee." },
+				{ front: "Who handles the taxes and benefits for a Freelancer?", back: "The Freelancer handles them personally as they operate their own business." },
+				{ front: "What defines 'Contractual' employment?", back: "A contract outlining specific start/end dates, scope of work, and pay." },
+				{ front: "From which language does the word 'resume' originate?", back: "French (résumé)." },
+				{ front: "What is the literal translation of the word 'résumé'?", back: "It means 'summary'." }
+			]
+			,
+			"P1": [
+				{ front: "Define the Zeroth Law of Thermodynamics.", back: "If A and B are in thermal equilibrium with C, then A and B are in equilibrium with each other." },
+				{ front: "What concept does the Zeroth Law define?", back: "Temperature." },
+				{ front: "What is Temperature measuring?", back: "The average kinetic energy of particles in a substance." },
+				{ front: "Is Temperature the same as total Heat energy?", back: "No. Total heat depends on mass and material; temperature is an average." },
+				{ front: "What is the SI unit for temperature?", back: "Kelvin (K)." },
+				{ front: "Define Heat.", back: "Energy in transit transferred due to temperature difference." },
+				{ front: "What direction does heat spontaneously flow?", back: "From higher temperature to lower temperature." },
+				{ front: "In what units is heat energy measured?", back: "Joules (J) or calories." },
+				{ front: "Define Conduction.", back: "Heat transfer through direct contact or electron movement, mainly in solids." },
+				{ front: "Which is generally the slowest method of heat transfer?", back: "Conduction." },
+				{ front: "Define Convection.", back: "Heat transfer by the actual movement of fluids (liquids or gases)." },
+				{ front: "What is a Convection Current?", back: "A cycle where warm fluid rises and cooler fluid replaces it." },
+				{ front: "What happens to fluid density when it warms?", back: "It expands and becomes less dense, causing it to rise." },
+				{ front: "List 2 examples of Convection.", back: "Boiling water and ocean currents." },
+				{ front: "Define Radiation.", back: "Heat transfer by electromagnetic waves." },
+				{ front: "Does Radiation require a medium?", back: "No, it can travel through a vacuum." },
+				{ front: "What is the speed of Radiation?", back: "The speed of light (3 x 10^8 m/s)." },
+				{ front: "What is the fastest method of heat transfer?", back: "Radiation." },
+				{ front: "Example of Radiation in space?", back: "Sunlight warming the Earth." },
+				{ front: "When does heat flow stop?", back: "When thermal equilibrium (equal temperature) is reached." }
+			]
+		};
+
+		function buildFlashcardsFromLesson(lesson, minCards = 15) {
+			const out = [];
+			if (!lesson || !lesson.content || !lesson.content.read) return out;
+			const tmp = document.createElement('div'); tmp.innerHTML = lesson.content.read;
+			let text = (tmp.innerText || tmp.textContent || '').replace(/\s+/g, ' ').trim();
+			if (!text) return out;
+			// split into sentences
+			let parts = text.split(/(?<=[\.\?!])\s+/).map(s=>s.trim()).filter(s=>s.length>20);
+			// fallback: collect headings/paragraphs
+			if (parts.length < minCards) {
+				parts = [];
+				Array.from(tmp.querySelectorAll('h1,h2,h3,h4,h5,p,li')).forEach(el => {
+					const t = (el.innerText||el.textContent||'').trim(); if (t && t.length>20) parts.push(t);
+				});
+			}
+			// ensure at least minCards
+			if (parts.length === 0) parts = [text];
+			let i = 0;
+			while (out.length < minCards) {
+				const p = parts[i % parts.length];
+				const front = p.length > 80 ? p.slice(0,80).trim() + '…' : p;
+				out.push({ front, back: p });
+				i++;
+				if (i>1000) break;
+			}
+			return out;
+		}
+
+		let currentFlashcardsArr = [];
+		let currentFlashIndex = 0;
+
+
+
+		function shuffleArray(a) {
+			for (let i = a.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[a[i], a[j]] = [a[j], a[i]];
+			}
+		}
+
+        
+
+		function showFlashcard(i) {
+			const frontEl = document.getElementById('card-front-text');
+			const backEl = document.getElementById('card-back-text');
+			const indexEl = document.getElementById('card-counter');
+			const cardEl = document.getElementById('flashcard-card');
+			const inner = document.getElementById('flashcard-inner');
+			const saveBtn = document.getElementById('fc-save');
+			if (!frontEl || !backEl || !indexEl || !cardEl || !inner) return;
+			if (!currentFlashcardsArr || currentFlashcardsArr.length === 0) {
+				frontEl.innerText = 'No flashcards available.';
+				backEl.innerText = '';
+				indexEl.innerText = '0 / 0';
+				return;
+			}
+			currentFlashIndex = (i + currentFlashcardsArr.length) % currentFlashcardsArr.length;
+			const c = currentFlashcardsArr[currentFlashIndex];
+			frontEl.innerText = c.front;
+			backEl.innerText = c.back;
+			indexEl.innerText = `${currentFlashIndex+1} / ${currentFlashcardsArr.length}`;
+			// reset flip state
+			inner.classList.remove('is-flipped');
+			// no save/print controls
+			cardEl.focus && cardEl.focus();
+		}
+
+		function flipCurrentFlashcard() {
+			const inner = document.getElementById('flashcard-inner');
+			if (!inner) return;
+			inner.classList.toggle('is-flipped');
+		}
+
+		function renderFlashcards() {
+			const stage = document.getElementById('flashcard-stage');
+			if (!stage) return;
+			if (!currentLesson) {
+				stage.innerHTML = '<div class="text-sm text-slate-500">No lesson selected.</div>';
+				return;
+			}
+			const preset = presetFlashcards[currentLesson.id];
+			currentFlashcardsArr = Array.isArray(preset) ? preset.slice() : buildFlashcardsFromLesson(currentLesson, 15);
+			if (!currentFlashcardsArr || currentFlashcardsArr.length === 0) {
+				stage.innerHTML = '<div class="text-sm text-slate-500">No flashcards available.</div>';
+				return;
+			}
+			// initialize view to first card
+			showFlashcard(0);
+
+			// attach handlers
+			const prev = document.getElementById('fc-prev');
+			const next = document.getElementById('fc-next');
+			const cardEl = document.getElementById('flashcard-card');
+			const shuffleBtn = document.getElementById('fc-shuffle');
+			if (prev) prev.onclick = () => showFlashcard(currentFlashIndex - 1);
+			if (next) next.onclick = () => showFlashcard(currentFlashIndex + 1);
+			if (shuffleBtn) shuffleBtn.onclick = () => { shuffleArray(currentFlashcardsArr); showFlashcard(0); };
+
+			if (cardEl) {
+				cardEl.onclick = () => flipCurrentFlashcard();
+				// keyboard: left/right for nav, space/enter to flip
+				cardEl.tabIndex = 0;
+				cardEl.onkeydown = (e) => {
+					if (e.key === 'ArrowLeft') { showFlashcard(currentFlashIndex - 1); e.preventDefault(); }
+					else if (e.key === 'ArrowRight') { showFlashcard(currentFlashIndex + 1); e.preventDefault(); }
+					else if (e.key === ' ' || e.key === 'Enter') { flipCurrentFlashcard(); e.preventDefault(); }
+				};
+			}
+			// global keyboard support too
+			document.onkeydown = (e) => {
+				if (document.getElementById('content-flashcards') && !document.getElementById('content-flashcards').classList.contains('hidden')) {
+					if (e.key === 'ArrowLeft') showFlashcard(currentFlashIndex - 1);
+					else if (e.key === 'ArrowRight') showFlashcard(currentFlashIndex + 1);
+					else if (e.key === ' ' || e.key === 'Enter') { flipCurrentFlashcard(); e.preventDefault(); }
+				}
+			};
 		}
 
 		// Profile handling
