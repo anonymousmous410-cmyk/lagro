@@ -536,7 +536,7 @@
 						}
 						},
 					{
-						id: "S2",
+						id: "s2",
 						week: "Week 2",
 						title: "Week 2: Greenhouse Effect & Earth's Temperature",
 						desc: "How the atmosphere acts as a natural blanket and the impact of human enhancement.",
@@ -602,7 +602,115 @@
 								{ q: "Earth's 'Goldilocks Zone' status is maintained by the balance of:", options: ["Distance and Atmosphere", "The Moon and Stars", "Oceans and Fish", "Wind and Rain"], a: 0 }
 							]
 						}
+					},
+
+					{
+					id: "s3",
+					week: "Week 3",
+					title: "Geology: The Formation of the Philippines",
+					desc: "Core vocabulary, tectonic plates, and the unique origin of our archipelago.",
+					content: { // Added this wrapper
+						read: `
+							<div class="objective-box">
+								<h4 class="font-bold">Core Vocabulary</h4>
+								<ul class="text-sm">
+									<li><strong>Archipelago:</strong> A large cluster of islands often sharing a common geological origin.</li>
+									<li><strong>Convergent Boundary:</strong> A region where two tectonic plates collide (Destructive Boundary).</li>
+									<li><strong>Subduction:</strong> Process where one plate is forced beneath another into the mantle.</li>
+									<li><strong>Trench:</strong> Long, steep-sided depressions on the ocean floor at subduction zones.</li>
+									<li><strong>Island Arc:</strong> Curved chain of volcanic islands parallel to a trench.</li>
+									<li><strong>Philippine Mobile Belt:</strong> Seismically active zone of crustal deformation making up most of the PH.</li>
+									<li><strong>Pacific Ring of Fire:</strong> A 40,000-km horseshoe region of intense volcanic/seismic activity.</li>
+								</ul>
+							</div>
+
+							<h2>The Formation of the Philippines</h2>
+							<p>The Philippine Archipelago was formed over millions of years through the collision of tectonic plates and intense volcanic activity. It sits at a complex junction of three major plates:</p>
+							
+							<ul>
+								<li><strong>Eurasian Plate</strong> (specifically the Sunda Plate) to the west.</li>
+								<li><strong>Philippine Sea Plate</strong> to the east.</li>
+								<li><strong>Indo-Australian Plate</strong> to the south.</li>
+							</ul>
+
+							<h3>Mechanisms of Creation</h3>
+							<p><strong>1. Subduction and Volcanism:</strong> Oceanic plates collide and melt into magma as they sink. This rising magma creates volcanic island arcs.</p>
+							
+							<p><strong>2. Tectonic Collision and Accretion:</strong> Continuous convergence causes arcs and landmasses to merge. Example: Palawan Microcontinental Block colliding with the Philippine Mobile Belt.</p>
+
+							<h2>Geological Stability</h2>
+							<p>The "mobile" in <strong>Philippine Mobile Belt</strong> means the region is restless and unstable. Being "sandwiched" between subducting plates makes it one of the most seismically active regions on Earth.</p>
+							<p>Our shape is a <strong>"work in progress"</strong>. Volcanic activity adds land, while trenches "consume" the edges of the islands into the mantle.</p>
+
+							<h2>The Unique Ancestry of Palawan</h2>
+							<p>Unlike the rest of the country (born from volcanoes), <strong>Palawan was once part of mainland Asia.</strong></p>
+							<ul>
+								<li><strong>Collision:</strong> 11-20 million years ago, the Palawan block crashed into the volcanic Philippine Mobile Belt.</li>
+								<li><strong>Stability:</strong> Sitting on ancient continental crust, Palawan has no active volcanoes and fewer earthquakes.</li>
+								<li><strong>Biology:</strong> Its plants and animals are more similar to mainland Southeast Asia than the rest of the PH.</li>
+							</ul>
+
+							<h2>Benefits of Volcanic Formation</h2>
+							<ol>
+								<li><strong>Geothermal Energy:</strong> The PH is a global leader, providing 9% to 27% of our electricity.</li>
+								<li><strong>Fertile Soil:</strong> Volcanic ash creates nutrient-rich soil for crops like sugar, abaca, and coffee.</li>
+								<li><strong>Mineral Resources:</strong> Rich in gold, copper, silver, and nickel.</li>
+								<li><strong>Tourism:</strong> Landmarks like Mt. Mayon and Taal support local eco-tourism.</li>
+							</ol>
+						`,
+						visual: {
+							title: "Tectonic Junction Distribution",
+							type: 'pie',
+							labels: ['Eurasian Plate', 'Philippine Sea Plate', 'Indo-Australian Plate'],
+							data: [40, 40, 20],
+							desc: "The Philippines is primarily influenced by these three major tectonic plates."
+						},
+						cards: [
+							{ front: "What is an Archipelago?", back: "A large cluster of islands sharing a common geological origin." },
+							{ front: "Define Convergent Boundary.", back: "A region where two tectonic plates collide (destructive boundary)." },
+							{ front: "What is Subduction?", back: "The process of one plate sinking beneath another into the mantle." },
+							{ front: "What are Trenches?", back: "Deep oceanic depressions formed at subduction zones." },
+							{ front: "What is the Philippine Mobile Belt?", back: "A restless, seismically active zone making up most of the PH." },
+							{ front: "What are the 3 plates meeting at the PH?", back: "Eurasian, Philippine Sea, and Indo-Australian plates." },
+							{ front: "Why is Palawan unique?", back: "It originated from mainland Asia, not underwater volcanoes." },
+							{ front: "How old was the Palawan-Mobile Belt collision?", back: "Roughly 11 to 20 million years ago." },
+							{ front: "Most stable part of the Philippines?", back: "Palawan (continental crust, no active volcanoes)." },
+							{ front: "Percentage of PH electricity from Geothermal?", back: "9% to 27%." },
+							{ front: "What adds new land to the PH?", back: "Volcanic activity." },
+							{ front: "What 'consumes' the edges of our islands?", back: "Trenches (subduction)." },
+							{ front: "Primary mechanism of island arc creation?", back: "Rising magma from subducting oceanic plates." },
+							{ front: "Common minerals found due to tectonic process?", back: "Gold, copper, silver, and nickel." },
+							{ front: "Example of a landmark for eco-tourism?", back: "Mt. Mayon or Taal Volcano." },
+							{ front: "Why are Palawan's animals similar to mainland Asia?", back: "Because of its mainland continental origin." },
+							{ front: "Length of the Pacific Ring of Fire?", back: "40,000 kilometers." },
+							{ front: "What kind of soil does volcanic ash produce?", back: "Fertile, nutrient-rich soil." },
+							{ front: "Is the PH shape final?", back: "No, it is a 'work in progress' due to active tectonics." },
+							{ front: "Definition of Island Arc?", back: "Curved chain of volcanic islands parallel to a trench." }
+						],
+						quiz: [
+							{ q: "Which region is characterized by intense volcanic and seismic activity in a horseshoe shape?", options: ["Philippine Belt", "Pacific Ring of Fire", "Eurasian Plate", "Atlantic Ridge"], a: 1 },
+							{ q: "The process where one plate is forced beneath another is called:", options: ["Accretion", "Subduction", "Erosion", "Sedimentation"], a: 1 },
+							{ q: "Which plate lies to the west of the Philippines?", options: ["Philippine Sea Plate", "Indo-Australian Plate", "Eurasian Plate", "Pacific Plate"], a: 2 },
+							{ q: "Why is the Philippine Mobile Belt called 'mobile'?", options: ["Because islands move with tides", "Because it is highly unstable and restless", "Because people move frequently", "Because of its transportation system"], a: 1 },
+							{ q: "Which part of the Philippines was once part of mainland Asia?", options: ["Luzon", "Visayas", "Mindanao", "Palawan"], a: 3 },
+							{ q: "Roughly how many years ago did Palawan collide with the Mobile Belt?", options: ["1-5 million", "50-100 million", "11-20 million", "100-200 million"], a: 2 },
+							{ q: "Which is a benefit of volcanic formation in the Philippines?", options: ["Frequent Earthquakes", "Geothermal Energy", "Ocean Trenches", "Typhoons"], a: 1 },
+							{ q: "What percentage of the nation's electricity can geothermal power provide?", options: ["1-5%", "9-27%", "50-60%", "75-90%"], a: 1 },
+							{ q: "Which of these crops benefit from volcanic soil in Negros?", options: ["Wheat", "Sugar", "Rice", "Corn"], a: 1 },
+							{ q: "The 'edges' of the islands are being consumed at:", options: ["Volcanoes", "Trenches", "Rivers", "Mountains"], a: 1 },
+							{ q: "What is a 'Trench'?", options: ["A mountain peak", "A steep depression on the ocean floor", "A volcanic crater", "A flat plain"], a: 1 },
+							{ q: "Which plate is to the south of the PH?", options: ["Eurasian", "Philippine Sea", "Indo-Australian", "Antarctic"], a: 2 },
+							{ q: "Why does Palawan have fewer earthquakes?", options: ["It is small", "It sits on ancient continental crust", "It is near the equator", "It has more trees"], a: 1 },
+							{ q: "Volcanic ash helps the industry of:", options: ["Steel", "Sugar", "Textile", "Electronics"], a: 1 },
+							{ q: "A large cluster of islands is called an:", options: ["Arc", "Archipelago", "Atoll", "Isthmus"], a: 1 },
+							{ q: "Convergent boundaries are also known as:", options: ["Constructive", "Destructive", "Transform", "Passive"], a: 1 },
+							{ q: "What rises from the mantle to create island arcs?", options: ["Water", "Magma", "Air", "Gold"], a: 1 },
+							{ q: "Tectonic processes make PH rich in:", options: ["Oil", "Minerals like Gold/Copper", "Coal", "Diamonds"], a: 1 },
+							{ q: "The collision that assembled the current PH structure involved Palawan and:", options: ["Eurasian Plate", "Philippine Mobile Belt", "Japan", "Borneo"], a: 1 },
+							{ q: "Palawan's biology is similar to:", options: ["Australia", "Mainland SE Asia", "Hawaii", "Japan"], a: 1 }
+						]
 					}
+				}
 				]
 			},
 
