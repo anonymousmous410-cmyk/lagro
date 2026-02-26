@@ -1,0 +1,17 @@
+:root{ --green:#059669 }
+body{ font-family: Inter, system-ui, Arial, sans-serif; margin:0 }
+.app-root{ min-height:100vh; display:flex; flex-direction:column; }
+.app-header{ background:var(--green); color:#fff; padding:16px; font-weight:700 }
+.app-main{ padding:24px }
+
+.posts{ display:flex; flex-direction:column; gap:12px; max-width:800px }
+.post{ border:1px solid #e5e7eb; padding:12px; border-radius:8px; background:#fff }
+.post-title{ font-weight:700; margin-bottom:6px }
+.post-meta{ color:#374151; margin-bottom:8px }
+.author-link{ background:none; border:0; color:#065f46; cursor:pointer; text-decoration:underline; padding:0; font:inherit }
+.post-actions{ display:flex; gap:8px }
+.like-btn, .dislike-btn{ background:#f3f4f6; border:1px solid #e5e7eb; padding:6px 10px; border-radius:6px; cursor:pointer }
+
+.modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; z-index:50 }
+.modal{ background:#fff; padding:18px; border-radius:10px; width:320px; box-shadow:0 10px 30px rgba(0,0,0,0.15) }
+.modal-close{ position:absolute; right:16px; top:12px; background:none; border:0; font-size:20px; cursor:pointer }
