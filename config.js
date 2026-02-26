@@ -12,7 +12,7 @@
 
 window.LAGRO_CONFIG = {
   LOCATIONIQ_API_KEY: "",
-  GOOGLE_GENERATIVE_API_KEY: ""
+  GOOGLE_GENERATIVE_API_KEY: "AIzaSyDdGnXKK4AIMidLiGMMo8blOj3b7TYdzqw" // Paste your key here
 };
 
 // Helper to get merged config (applies runtime override if present)
