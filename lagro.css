@@ -31,8 +31,8 @@
 .getblack-header {
 	border: 1px solid transparent;
 	padding: 2px 12px;
-	width: 1317px;
-	max-width: 95%;
+	width: calc(100% - 2rem);
+	max-width: 1317px;
 	height: 48px;
 	background-color: #06402b;
 	margin: 0 auto;
@@ -49,7 +49,7 @@
 .getblack-header .left-group, .getblack-header .right-group { display:flex; align-items:center; gap:12px; }
 
 /* keep page content visible below the absolute header */
-body { padding-top: 1rem; }
+body { padding-top: 4rem; }
 
 /* Ensure Academic Dashboard sits below header (reduced spacing) */
 #view-subjects { padding-top: 1.5rem; }
@@ -91,7 +91,7 @@ body { padding-top: 1rem; }
 
 /* Header hide/show on scroll */
 /* Allow header to hide on scroll while keeping the original absolute layout */
-.getblack-header { transition: transform 0.24s ease, opacity: 0.24s ease; will-change: transform; }
+.getblack-header { transition: transform 0.24s ease, opacity 0.24s ease; will-change: transform; }
 .getblack-header.header-hidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
 
 /* Dark mode adjustments (basic) */
@@ -108,3 +108,9 @@ body.dark .lesson-content p, body.dark .lesson-content li { color: #cbd5e1; }
 @media (prefers-reduced-motion: reduce) {
 	.getblack-header { transition: none; }
 }
+
+/* Community posts */
+/* community posts removed */
+.author-link { background: none; border: none; padding: 0; color: #065f46; cursor: pointer; text-decoration: underline; font: inherit; }
+.like-btn, .dislike-btn { cursor: pointer; border: 1px solid transparent; }
+.modal-panel { position: relative; }
