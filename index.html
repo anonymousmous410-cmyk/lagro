@@ -8,6 +8,9 @@
 		<script src="https://cdn.tailwindcss.com"></script>
 		<!-- Chart.js (optional) -->
 		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<!-- Tesseract.js for OCR and PDF.js for PDF text extraction -->
+		<script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
 		<!-- Google Fonts -->
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 
@@ -28,6 +31,162 @@
 					}
 				}
 			};
+		</script>
+
+		<!-- Local overrides (dev only) -->
+		<script src="local-override.js"></script>
+		<!-- Load centralized config (contains firebase + API placeholders) -->
+		<script src="config.js"></script>
+		<script type="module">
+		// Initialize Firebase using the centralized `config.js` helpers and re-export helpers
+		import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+		import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+		import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, updateDoc, increment, getDocs, getDoc, setDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+		const firebaseConfig = (window.getLagroFirebaseConfig && window.getLagroFirebaseConfig()) || window.__LAGRO_FIREBASE_CONFIG__ || {};
+		const apiKey = (window.getLagroConfig && window.getLagroConfig().GOOGLE_GENERATIVE_API_KEY) || '';
+
+		const app = initializeApp(firebaseConfig);
+		const auth = getAuth(app);
+		const db = getFirestore(app);
+
+		// listen for auth state and forward to main script
+		onAuthStateChanged(auth, (user) => {
+			try { if (window.applyFirebaseUser) window.applyFirebaseUser(user); } catch(e){}
+		});
+
+		// expose sign-in/up/out functions for the non-module script
+		async function firebaseSignIn(email, password) {
+			const cred = await signInWithEmailAndPassword(auth, email, password);
+			return cred.user;
+		}
+
+		async function firebaseSignUp(email, password) {
+			const cred = await createUserWithEmailAndPassword(auth, email, password);
+			return cred.user;
+		}
+
+		async function firebaseSignOut() {
+			return await signOut(auth);
+		}
+
+		async function firebaseSignInWithGoogle() {
+			const provider = new GoogleAuthProvider();
+			try {
+				const cred = await signInWithPopup(auth, provider);
+				return cred.user;
+			} catch (e) { throw e; }
+		}
+
+		async function generateLessonWithAI(extractedText) {
+			if (!apiKey) return null;
+			const prompt = `Act as an expert educator. Given the following extracted lesson text, produce a JSON object with keys:\n` +
+				`"title": string, "reading": string (3-4 paragraphs), "visual": string, "flashcards": [{front,back}], "quiz": [{question, options: [], answer: index}]\n\nText:\n` + extractedText;
+			const payload = { contents: [{ parts: [ { text: prompt } ] }], generationConfig: { responseMimeType: "application/json" } };
+			const resp = await fetch(`https://generativelanguage.googleapis.com/v2/models/gemini-2.0-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+			const j = await resp.json();
+			try {
+				const txt = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
+				return JSON.parse(txt);
+			} catch (e) { console.warn('AI parse failed', e, j); return null; }
+		}
+
+		export async function uploadLessonToCloud(lesson, subjectId) {
+			if (!db) throw new Error('No Firestore');
+			let payload = { ...lesson };
+			if (lesson.extractedText && lesson.extractedText.length > 30) {
+				try {
+					const ai = await generateLessonWithAI(lesson.extractedText);
+					if (ai) payload = { ...payload, generated: ai };
+				} catch (e) { console.warn(e); }
+			}
+			const ref = collection(db, 'artifacts', 'lagro-reviewer', 'public', 'data', `lessons_${subjectId}`);
+			await addDoc(ref, { ...payload, createdAt: serverTimestamp(), sharedBy: auth.currentUser ? auth.currentUser.uid : null });
+		}
+
+		// expose to window for usage in non-module code
+		window.uploadLessonToCloud = uploadLessonToCloud;
+		window.firebaseSignIn = firebaseSignIn;
+		window.firebaseSignUp = firebaseSignUp;
+		window.firebaseSignOut = firebaseSignOut;
+		window.firebaseSignInWithGoogle = firebaseSignInWithGoogle;
+
+		// Lightweight Firestore helpers for community posts (used by non-module scripts)
+		window.firestore = {
+			subscribePosts: function(cb){
+				try {
+					const ref = collection(db, 'community_posts');
+					const q = query(ref, orderBy('createdAt', 'desc'));
+					return onSnapshot(q, snap => { cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+				} catch(e){ console.warn('subscribePosts failed', e); return function(){}; }
+			},
+			createPost: async function(post){
+				if (!db) throw new Error('No Firestore');
+				const ref = collection(db, 'community_posts');
+				const payload = { ...post, likes: post.likes||0, dislikes: post.dislikes||0, createdAt: serverTimestamp() };
+				const r = await addDoc(ref, payload);
+				return { id: r.id, ...payload };
+			},
+			votePost: async function(postId, kind){
+				if (!db) throw new Error('No Firestore');
+				const dref = doc(db, 'community_posts', postId);
+				await updateDoc(dref, { [kind === 'like' ? 'likes' : 'dislikes']: increment(1) });
+			},
+			getAuthors: async function(){
+				try { const ref = collection(db, 'community_authors'); const snap = await getDocs(ref); return snap.docs.map(d => ({ id: d.id, ...d.data() })); }
+				catch(e){ console.warn('getAuthors failed', e); return []; }
+			},
+			ensureAuthor: async function(author){
+				if (!db) throw new Error('No Firestore');
+				// try to find existing author by name
+				try {
+					const ref = collection(db, 'community_authors');
+					const q = query(ref, where('name','==', author.name));
+					const snap = await getDocs(q);
+					if (snap && snap.docs && snap.docs.length) {
+						const d = snap.docs[0];
+						return { id: d.id, ...d.data() };
+					}
+				} catch(e){ /* ignore */ }
+				const ref = collection(db, 'community_authors');
+				const r = await addDoc(ref, author); return { id: r.id, ...author };
+			},
+			// store a lesson as a community lesson (public)
+			createLesson: async function(lesson, subjectId){
+				if (!db) throw new Error('No Firestore');
+				const ref = collection(db, 'lessons');
+				const payload = { ...lesson, subjectId, likes: lesson.likes||0, dislikes: lesson.dislikes||0, createdAt: serverTimestamp(), authorId: lesson.authorId || (auth.currentUser ? auth.currentUser.uid : null) };
+				const r = await addDoc(ref, payload);
+				return { id: r.id, ...payload };
+			},
+			subscribeLessons: function(cb){
+				try { const ref = collection(db, 'lessons'); const q = query(ref, orderBy('createdAt','desc')); return onSnapshot(q, snap => cb(snap.docs.map(d=>({ id:d.id, ...d.data() }))) ); }
+				catch(e){ console.warn('subscribeLessons failed', e); return function(){}; }
+			},
+			voteLesson: async function(lessonId, kind){
+				if (!db) throw new Error('No Firestore');
+				const dref = doc(db, 'lessons', lessonId); await updateDoc(dref, { [kind === 'like' ? 'likes' : 'dislikes']: increment(1) });
+			},
+			getUserProfile: async function(uid){
+				try { const dref = doc(db, 'users', uid); const snap = await getDoc(dref); if (!snap.exists()) return null; return { id: snap.id, ...snap.data() }; }
+				catch(e){ console.warn('getUserProfile failed', e); return null; }
+			},
+			saveUserScore: async function(uid, testId, score){
+				if (!db) throw new Error('No Firestore');
+				try {
+					const uref = doc(db, 'users', uid);
+					// merge scores into a map stored in `scores` on user doc
+					const snapshot = await getDoc(uref);
+					if (!snapshot.exists()) {
+						await setDoc(uref, { scores: { [testId]: score }, updatedAt: serverTimestamp() }, { merge: true });
+					} else {
+						const data = snapshot.data() || {};
+						const scores = Object.assign({}, data.scores || {}, { [testId]: score });
+						await updateDoc(uref, { scores, updatedAt: serverTimestamp() });
+					}
+				} catch(e){ console.warn('saveUserScore failed', e); }
+			}
+		};
 		</script>
 
 		<link rel="stylesheet" href="lagro.css">
@@ -88,6 +247,54 @@
 			body.dark #fc-prev, body.dark #fc-next, body.dark .fc-action { background:#071426 !important; border:1px solid rgba(255,255,255,0.06) !important; color:#e6eef8 !important; box-shadow: 0 6px 20px rgba(2,6,23,0.6) !important; }
 			body.dark .fc-action:hover { transform: translateY(-2px); }
 		</style>
+		<style>
+/* Mobile: hide file previews and preview panel to avoid blocking dropzone and simplify uploads */
+@media (max-width: 640px) {
+	#add-lesson-file-previews { display: none !important; }
+	#add-lesson-preview { display: none !important; }
+	.lesson-thumb { display: none !important; }
+}
+/* Ensure thumbnails are nicely contained on larger screens */
+.lesson-thumb img { display: block; width:100%; height:100%; object-fit:cover; }
+</style>
+		<style>
+		/* Responsive header, modals and lesson items for mobile */
+		@media (max-width: 640px) {
+			.getblack-header {
+				position: fixed !important;
+				left: 0.5rem !important;
+				right: 0.5rem !important;
+				top: 0.5rem !important;
+				transform: none !important;
+				width: auto !important;
+				padding: 6px 10px !important;
+				height: auto !important;
+				z-index: 99999 !important;
+			}
+			.getblack-header .left-group { gap:8px; }
+			.getblack-header .right-group { gap:8px; }
+			.getblack-header .left-group h1 { display:none !important; }
+			#profile-name { display:none !important; }
+			#add-menu-btn { padding:6px 8px !important; font-size:0.9rem !important; }
+				/* make lesson rows more compact on mobile */
+				.lesson-item { padding: 1rem !important; }
+				/* leave room for the pull-area on the right so actions sit off-screen until swiped */
+				.lesson-row { padding-right: 10px !important; width: 100% !important; }
+			/* modal panels fit the viewport on phones */
+			.modal-panel { max-width: 95vw !important; margin: 0 10px !important; padding: 1rem !important; max-height: 90vh !important; overflow: auto !important; }
+			/* Make dropzone full-width and touch-friendly */
+			#add-lesson-dropzone { padding: 1.25rem !important; }
+
+				/* On small screens keep the delete button positioned on the right but hidden until swipe (pull effect) */
+				.lesson-item { position: relative; overflow: hidden; }
+				.lesson-item .lesson-actions { position: absolute !important; right: 10px !important; top: 50% !important; transform: translate(20px, -50%) !important; opacity: 0 !important; display:flex !important; align-items:center !important; gap:8px !important; transition: transform .18s ease, opacity .18s ease; }
+				/* ensure lesson rows leave room for the actions so content isn't covered */
+				.lesson-row { padding-right: 10px !important; }
+				/* reveal actions when swipe-left state is applied */
+				.lesson-item.swipe-left .lesson-actions { transform: translate(0, -50%) !important; opacity: 1 !important; }
+				.lesson-item.swipe-left .lesson-row { transform: translateX(var(--lagro-row-reveal, -100px)) !important; }
+		}
+		</style>
         
 		<!-- tailwind config moved to lagro-tailwind-config.js -->
 	</head>
@@ -109,6 +316,14 @@
 					<div id="profile-avatar" class="w-8 h-8 bg-white text-lagro-green rounded-full flex items-center justify-center font-bold">U</div>
 					<span id="profile-name" class="hidden sm:inline text-sm">User</span>
 				</button>
+				<!-- Add menu: Add Subject / Add Lesson -->
+				<div class="relative ml-3">
+					<button id="add-menu-btn" onclick="toggleAddMenu && toggleAddMenu(event)" title="Add..." style="position:relative;z-index:10001" class="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm flex items-center gap-2">+ Add <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+					<div id="add-menu" class="hidden absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-emerald-100 z-50 overflow-hidden" style="transform: translateY(6px);">
+						<button onclick="openAddSubjectModal()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Add Subject</button>
+						<button onclick="openAddLessonModal()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Add Lesson</button>
+					</div>
+				</div>
 				<span id="profile-gpa-badge" class="hidden gpa-badge">GPA —</span>
 				<div id="profile-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-emerald-100 z-30 overflow-hidden" style="transform: translateY(6px);">
 					<div id="menu-body"></div>
@@ -126,6 +341,8 @@
 				<p class="text-slate-500 mt-2">WAZUP LAGRONIANS!</p>
 			</div>
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="subject-grid"></div>
+
+
 		</div>
 
 		<div id="view-lessons" class="hidden fade-in">
@@ -205,13 +422,10 @@
 				<div class="flex flex-col sm:flex-row items-start sm:items-center gap-6">
 					<div class="w-28 h-28 bg-emerald-50 rounded-lg flex items-center justify-center text-3xl font-bold text-lagro-green" id="profile-page-avatar">U</div>
 					<div class="flex-1">
-						<div class="flex items-center justify-between">
+								<div class="flex items-center justify-between">
 							<div>
 								<div id="profile-page-name" class="text-2xl font-bold text-lagro-green">Guest User</div>
 								<div id="profile-page-email" class="text-sm text-slate-500">—</div>
-							</div>
-							<div>
-								<button onclick="openProfileModal()" class="px-4 py-2 rounded bg-lagro-emerald text-white">Edit Profile</button>
 							</div>
 						</div>
 						<div class="mt-4">
@@ -255,54 +469,113 @@
 
 	</main>
 
-	<!-- Profile Modal -->
-	<div id="profile-modal" class="fixed inset-0 hidden items-center justify-center z-40">
-		<div class="absolute inset-0 bg-black/40" onclick="closeProfileModal()"></div>
-		<div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-50">
-			<h3 class="text-lg font-bold text-lagro-green mb-4">Your Profile</h3>
-			<div class="grid gap-3">
-				<label class="text-sm">Name
-					<input id="input-name" class="mt-1 w-full border rounded p-2 profile-input" />
-				</label>
-				<label class="text-sm">Email
-					<input id="input-email" class="mt-1 w-full border rounded p-2 profile-input" />
-				</label>
-			</div>
-			<div class="mt-4">
-				<div class="text-sm text-slate-600">Overall GPA: <strong id="profile-gpa">—</strong></div>
-				<div id="profile-gpa-list" class="mt-2 text-sm text-slate-500"></div>
-			</div>
-			<div class="mt-4 flex justify-end gap-2">
-				<button onclick="closeProfileModal()" class="px-4 py-2 rounded bg-slate-100">Cancel</button>
-				<button onclick="saveProfile()" class="px-4 py-2 rounded bg-lagro-emerald text-white">Save</button>
-			</div>
-		</div>
+	<!-- Profile Modal removed per request -->
+
+<!-- Author modal for community posts -->
+<div id="author-modal" class="fixed inset-0 hidden items-center justify-center z-50">
+	<div class="absolute inset-0 bg-black/40" onclick="closeAuthorModal()"></div>
+	<div class="modal-panel bg-white rounded-2xl shadow-xl max-w-md w-full p-6 z-50">
+		<button onclick="closeAuthorModal()" class="absolute right-4 top-3 text-xl">×</button>
+		<h3 id="author-name" class="text-2xl font-bold text-lagro-green mb-2">Author</h3>
+		<p class="text-sm text-slate-600">GPA: <strong id="author-gpa">—</strong></p>
+		<p class="text-sm text-slate-600">Effectiveness: <strong id="author-effectiveness">—</strong></p>
+		<h4 class="mt-4 font-semibold text-lagro-green">Lessons</h4>
+		<ul id="author-posts" class="list-disc pl-6 mt-2 text-sm text-slate-600"></ul>
 	</div>
+</div>
 
 	<!-- Login Modal -->
 	<div id="login-modal" class="fixed inset-0 hidden items-center justify-center z-50">
 		<div class="absolute inset-0 bg-black/40" onclick="closeLoginModal()"></div>
-		<div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 z-50">
-			<h3 class="text-lg font-bold text-lagro-green mb-4">Sign In</h3>
-			<div class="grid gap-3">
-				<label class="text-sm">Email
-					<input id="login-email" type="email" class="mt-1 w-full border rounded p-2 profile-input" />
-				</label>
-				<label class="text-sm">Password
-					<input id="login-password" type="password" class="mt-1 w-full border rounded p-2 profile-input" />
-				</label>
-			</div>
-			<div class="mt-4 flex justify-between items-center">
-				<div class="text-sm text-slate-500">No backend — demo-only login</div>
-				<div class="flex gap-2">
-					<button onclick="closeLoginModal()" class="px-4 py-2 rounded bg-slate-100">Cancel</button>
-					<button onclick="performLogin()" class="px-4 py-2 rounded bg-lagro-emerald text-white">Sign In</button>
+		<div class="modal-panel bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-6 z-50">
+			<h3 class="text-2xl font-bold text-lagro-green mb-2">Welcome Lagro!</h3>
+			<p class="text-sm text-slate-500 mb-4">Please enter your details</p>
+			<div class="space-y-3">
+				<div id="login-choices" class="space-y-3">
+					<button type="button" onclick="continueAsGuest()" class="w-full py-3 rounded-lg bg-slate-100 text-slate-800 font-semibold shadow">Continue as Guest</button>
+					<button type="button" onclick="signInWithGoogleHandler()" class="w-full py-3 rounded-lg border flex items-center justify-center gap-3 bg-white">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.6 12.227c0-.68-.062-1.336-.177-1.966H12v3.726h5.44c-.234 1.256-.944 2.32-2.014 3.036v2.522h3.256c1.906-1.755 3.02-4.342 3.02-7.318z" fill="#4285F4"/><path d="M12 22c2.43 0 4.472-.806 5.96-2.184l-3.256-2.522c-.896.6-2.044.956-3.204.956-2.46 0-4.54-1.66-5.285-3.888H3.254v2.444C4.736 19.94 8.132 22 12 22z" fill="#34A853"/><path d="M6.715 14.362A7.997 7.997 0 016 12c0-.67.112-1.318.322-1.944V7.61H3.254A10.965 10.965 0 002 12c0 1.743.418 3.39 1.154 4.768l3.56-2.406z" fill="#FBBC05"/><path d="M12 6.5c1.318 0 2.504.452 3.438 1.336l2.586-2.586C16.469 3.62 14.43 2.5 12 2.5 8.132 2.5 4.736 4.56 3.254 7.61l3.868 2.99C7.46 8.16 9.54 6.5 12 6.5z" fill="#EA4335"/></svg>
+						<span class="text-sm">Sign in with Google</span>
+					</button>
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<script>
+	<!-- Add Lesson Modal -->
+	<div id="add-lesson-modal" class="fixed inset-0 hidden items-center justify-center z-50">
+		<div class="absolute inset-0 bg-black/40" onclick="closeAddLessonModal()"></div>
+		<div class="modal-panel bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl shadow-xl max-w-xl w-full p-6 z-50">
+			<div class="flex items-center justify-between mb-4">
+				<h3 id="add-lesson-title" class="text-lg font-bold text-lagro-green">Add New Lesson</h3>
+				<button onclick="closeAddLessonModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+			</div>
+			<div class="space-y-4">
+				<label class="text-sm block">Subject
+					<select id="add-lesson-subject" class="mt-1 w-full border rounded p-2"></select>
+				</label>
+				<label class="text-sm block">Lesson Title
+					<input id="add-lesson-title-input" class="mt-1 w-full border rounded p-2" placeholder="e.g. Earth's Atmosphere" />
+				</label>
+				<label class="text-sm block">Short Description
+					<input id="add-lesson-desc-input" class="mt-1 w-full border rounded p-2" placeholder="Brief summary" />
+				</label>
+				<label class="text-sm block">Upload Source Material
+					<div id="add-lesson-dropzone" class="mt-2 p-6 border-2 border-dashed rounded text-center text-slate-400 cursor-pointer">
+						<div class="flex flex-col items-center justify-center">
+							<div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-2xl mb-2">⬆️</div>
+							<div class="text-sm font-bold">Click or drag & drop to upload</div>
+							<div class="text-xs text-slate-400 mt-1">Images (PNG, JPG) or PDFs</div>
+						</div>
+						<input id="add-lesson-files" type="file" multiple class="hidden" accept="image/*,application/pdf,video/*,text/*" onchange="handleAddLessonFiles(event)" />
+					</div>
+					<div id="add-lesson-file-previews" class="mt-3 grid grid-cols-3 gap-3"></div>
+					<div id="add-lesson-preview" class="mt-4 p-4 bg-emerald-50 rounded hidden">
+						<h4 class="text-sm font-bold text-lagro-green mb-2">Auto-generated Preview</h4>
+						<div id="add-lesson-preview-summary" class="text-sm text-slate-300 mb-3"></div>
+						<div id="add-lesson-preview-chart-wrap" class="mb-3" style="min-height:120px;"></div>
+						<div id="add-lesson-preview-cards" class="grid grid-cols-1 gap-2 text-sm text-slate-300"></div>
+						<div id="add-lesson-preview-meta" class="text-xs text-slate-500 mt-2"></div>
+					</div>
+				</label>
+			</div>
+			<div class="mt-6 flex justify-end gap-2">
+				<button onclick="closeAddLessonModal()" class="px-4 py-2 rounded bg-slate-100">Cancel</button>
+				<button onclick="submitAddLesson()" id="add-lesson-submit" class="px-4 py-2 rounded bg-lagro-emerald text-white">Create Lesson</button>
+			</div>
+		</div>
+	</div>
+
+	
+		<!-- Add Subject Modal -->
+		<div id="add-subject-modal" class="fixed inset-0 hidden items-center justify-center z-60">
+			<div class="absolute inset-0 bg-black/40" onclick="closeAddSubjectModal()"></div>
+			<div class="modal-panel bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl shadow-xl max-w-lg w-full p-6 z-50">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-bold text-lagro-green">Add Subject</h3>
+					<button onclick="closeAddSubjectModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+				</div>
+				<div class="space-y-4">
+					<label class="text-sm block">Title
+						<input id="add-subject-title" class="mt-1 w-full border rounded p-2" placeholder="e.g. Biology" />
+					</label>
+
+					<label class="text-sm block">Icon / Logo
+						<input id="add-subject-icon" class="mt-1 w-full border rounded p-2" placeholder="e.g. 📚 or /images/icon.png" />
+						<div class="text-xs text-slate-500 mt-1">Use an emoji (recommended) or an image URL.</div>
+					</label>
+					<label class="text-sm block">Description
+						<textarea id="add-subject-desc" class="mt-1 w-full border rounded p-2" rows="3" placeholder="Short description"></textarea>
+					</label>
+				</div>
+				<div class="mt-4 flex justify-end gap-2">
+					<button onclick="closeAddSubjectModal()" class="px-4 py-2 rounded bg-slate-100">Cancel</button>
+					<button onclick="submitAddSubject()" id="add-subject-submit" class="px-4 py-2 rounded bg-lagro-emerald text-white">Create Subject</button>
+				</div>
+			</div>
+		</div>
+
+		<script>
 		const subjects = {
 			"career": {
 				id: "career",
@@ -582,7 +855,7 @@
 							quiz: [
 								{ q: "The greenhouse effect is primarily a ______ process.", options: ["Harmful", "Natural", "Artificial", "Dangerous"], a: 1 },
 								{ q: "Which gas is considered the most abundant 'natural' greenhouse gas?", options: ["Oxygen", "Carbon Dioxide", "Water Vapor", "Argon"], a: 2 },
-								{ q: "What analogy is used to describe how the atmosphere keeps Earth warm?", options: ["The Sponge Analogy", "The Blanket Analogy", "The Mirror Analogy", "The Filter Analogy"], a: 1 },
+								{ q: "What does the 'Blanket Analogy' explain?", options: ["The Sponge Analogy", "The Blanket Analogy", "The Mirror Analogy", "The Filter Analogy"], a: 1 },
 								{ q: "Methane ($CH_4$) is mainly emitted from which source?", options: ["Deforestation", "Livestock and Landfills", "Aerosol Cans", "Oceans"], a: 1 },
 								{ q: "Burning fossil fuels primarily increases which gas?", options: ["Nitrogen", "Oxygen", "Carbon Dioxide", "Neon"], a: 2 },
 								{ q: "Energy coming from the sun is called:", options: ["Infrared Radiation", "Solar Radiation", "Thermal Energy", "Microwaves"], a: 1 },
@@ -899,12 +1172,173 @@
 		function renderLessons() {
 			document.getElementById('lesson-page-title').innerText = currentSubject.title;
 			const list = document.getElementById('lesson-list'); list.innerHTML = '';
+			ensureSwipeStyles();
 			currentSubject.lessons.forEach(ls => {
-				list.innerHTML += `<li onclick="selectLesson('${ls.id}')" class="lesson-item p-6 cursor-pointer transition flex justify-between items-center group">
-					<div><h4 class="text-lg font-bold text-lagro-green group-hover:text-emerald-600 transition">${ls.title}</h4><p class="text-sm text-slate-500 mt-1">${ls.desc}</p></div>
-					<span class="text-lagro-emerald opacity-50 group-hover:opacity-100 transition font-bold">START QUIZ →</span>
-				</li>`;
+				const li = document.createElement('li');
+				li.className = 'lesson-item p-6 cursor-pointer transition group relative overflow-hidden';
+				// build thumbnail if image attachment exists
+				let thumbHtml = '';
+				try {
+					if (ls.attachments && ls.attachments.length) {
+						const imgAttach = ls.attachments.find(a => (a.type || '').startsWith('image/')) || ls.attachments[0];
+						if (imgAttach && imgAttach.dataUrl) {
+							thumbHtml = `<div class="lesson-thumb w-24 h-24 mr-4 rounded overflow-hidden flex-shrink-0"><img src="${imgAttach.dataUrl}" class="w-full h-full object-cover" alt="${escapeHtml(ls.title)}"/></div>`;
+						}
+					}
+				} catch (e) { thumbHtml = ''; }
+				li.innerHTML = `
+					<div class="lesson-row flex justify-between items-center w-full transition-transform duration-200" style="transform:translateX(0);">
+						<div class="lesson-main flex items-center">
+							${thumbHtml}
+							<div>
+								<h4 class="text-lg font-bold text-lagro-green group-hover:text-emerald-600 transition">${ls.title}</h4>
+								<p class="text-sm text-slate-500 mt-1">${ls.desc}</p>
+							</div>
+							</div>
+						<div class="lesson-actions flex items-center gap-4" style="flex-shrink:0;">
+							<button class="delete-lesson-btn ml-2 px-3 py-1 text-sm bg-red-50 text-red-600 rounded-md border border-red-100 hover:bg-red-100" data-lesson-id="${ls.id}" title="Delete lesson">Delete</button>
+						</div>
+					</div>`;
+
+				list.appendChild(li);
+				// Ensure actions sit outside the translated row so they don't move with it
+				const actionsEl = li.querySelector('.lesson-actions');
+				if (actionsEl) li.appendChild(actionsEl);
+				// Make the whole lesson item clickable (except action buttons). Ignore swipe interactions.
+				li.addEventListener('click', (e) => {
+					// if user clicked inside the actions area or on the delete button, ignore
+					if (e.target.closest('.lesson-actions') || e.target.closest('.delete-lesson-btn')) return;
+					if (li._swipeMoved) { e.stopPropagation(); e.preventDefault(); li._swipeMoved = false; return; }
+					// hide any open swipe-delete on other items before opening the selected lesson
+					try { closeAllSwipes(); } catch (err) {}
+					selectLesson(ls.id);
+				});
+				const delBtn = li.querySelector('.delete-lesson-btn');
+				if (delBtn) delBtn.addEventListener('click', (ev) => { ev.stopPropagation(); const lid = ev.currentTarget.getAttribute('data-lesson-id'); if (lid) deleteLesson(lid); });
+				attachSwipeHandlers(li);
 			});
+		}
+
+		function ensureSwipeStyles() {
+			if (document.getElementById('lagro-swipe-styles')) return;
+			const s = document.createElement('style');
+			s.id = 'lagro-swipe-styles';
+				s.innerHTML = `
+				.lesson-item { position: relative; overflow: hidden; }
+				/* reserve room to the right so the delete action can overlay without pushing content */
+				.lesson-row { will-change: transform; padding-right: 10px; transition: transform .18s ease; width: 100%; display: flex; align-items: center; position: relative; }
+				/* actions are absolutely positioned so they overlay the row when revealed (pull effect)
+				   keep them vertically centered and offset 10px from the right edge */
+				.lesson-item .lesson-actions { position: absolute; right: 10px; top: 50%; transform: translate(20px, -50%); opacity: 0; transition: transform .18s ease, opacity .18s ease; display:flex; align-items:center; gap:8px; pointer-events: auto; }
+				/* Styled delete button to match site aesthetic */
+				.lesson-item .delete-lesson-btn { pointer-events: auto; background: linear-gradient(180deg,#fee2e2,#fecaca); color:#b91c1c; border:1px solid rgba(185,28,28,0.08); padding:8px 10px; border-radius:10px; font-weight:700; box-shadow: 0 6px 18px rgba(2,6,23,0.04); }
+				.lesson-item .delete-lesson-btn:hover { background: linear-gradient(180deg,#fecaca,#fca5a5); color:#7f1d1d; transform: translateY(-1px); }
+				body.dark .lesson-item .delete-lesson-btn { background: linear-gradient(180deg,#2b0d0d,#3b0b0b); color:#fecaca; border:1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
+				body.dark .lesson-item .delete-lesson-btn:hover { background: linear-gradient(180deg,#3b0b0b,#4b0f0f); color:#ffd6d6; }
+				/* when swiped left the row moves and the actions are revealed in-place (pull effect) */
+				/* when swiped left the row shifts left slightly and the absolutely-positioned actions fade/slide into view */
+				.lesson-item.swipe-left .lesson-row { transform: translateX(var(--lagro-row-reveal, -100px)) !important; }
+				.lesson-item.swipe-left .lesson-actions { transform: translate(0, -50%) !important; opacity: 1 !important; }
+				`;
+			document.head.appendChild(s);
+		}
+
+		function closeAllSwipes() {
+			const open = document.querySelectorAll('.lesson-item.swipe-left');
+			open.forEach(el => { el.classList.remove('swipe-left'); const row = el.querySelector('.lesson-row'); if (row) row.style.transform = 'translateX(0)'; });
+		}
+
+		// Prevent clicks inside modals from bubbling to global document handlers
+		document.addEventListener('DOMContentLoaded', () => {
+			const loginModal = document.getElementById('login-modal');
+			if (loginModal) {
+				const inner = loginModal.querySelector('.modal-panel');
+				if (inner) inner.addEventListener('click', (e) => e.stopPropagation());
+				// Enter to submit
+				const email = document.getElementById('login-email');
+				const pwd = document.getElementById('login-password');
+				const submitOnEnter = (e) => { if (e.key === 'Enter') { e.preventDefault(); performLogin(); } };
+				if (email) email.addEventListener('keydown', submitOnEnter);
+				if (pwd) pwd.addEventListener('keydown', submitOnEnter);
+			}
+		});
+
+		function attachSwipeHandlers(li) {
+			const row = li.querySelector('.lesson-row');
+			if (!row) return;
+			// fixed distances: row moves 100px, delete button slides from -20px -> -10px
+			const rowReveal = 100;
+			const delStart = 30;
+			const delEnd = 0;
+			const actions = li.querySelector('.lesson-actions');
+			const delBtn = actions && actions.querySelector('.delete-lesson-btn');
+			try { li.style.setProperty('--lagro-row-reveal', `-${rowReveal}px`); } catch (e) {}
+			row.style.paddingRight = (rowReveal + 12) + 'px';
+			if (delBtn) { delBtn.style.transition = 'transform .18s ease, opacity .18s ease'; delBtn.style.transform = `translateX(${delStart}px)`; delBtn.style.opacity = '0'; }
+			let startX = 0, currentX = 0, touching = false, moved = false, pointerId = null;
+			const threshold = Math.min(60, Math.round(rowReveal / 2));
+			function onStart(e) {
+				touching = true; moved = false;
+				startX = e.touches ? e.touches[0].clientX : (e.clientX || 0);
+				currentX = startX;
+				row.style.transition = 'none';
+				if (e.pointerId) { pointerId = e.pointerId; try { e.target.setPointerCapture && e.target.setPointerCapture(pointerId); } catch(err){} }
+			}
+			function onMove(e) {
+				if (!touching) return;
+				currentX = e.touches ? e.touches[0].clientX : (e.clientX || 0);
+				const dx = currentX - startX;
+				if (Math.abs(dx) > 8) { moved = true; li._swipeMoved = true; }
+				if (dx < 0) {
+					const tx = Math.max(dx, -rowReveal);
+					row.style.transform = `translateX(${tx}px)`;
+					if (delBtn) {
+						const pct = Math.min(1, Math.abs(tx) / rowReveal);
+						const val = Math.round(delStart + ( (delEnd - delStart) * pct ));
+						delBtn.style.transform = `translateX(${val}px)`;
+						delBtn.style.opacity = (pct > 0.05) ? '1' : '0';
+					}
+				} else if (!li.classList.contains('swipe-left')) {
+					row.style.transform = `translateX(${Math.min(dx,20)}px)`;
+				}
+			}
+			function onEnd(e) {
+				if (!touching) return;
+				touching = false;
+				try { if (pointerId && e.target.releasePointerCapture) e.target.releasePointerCapture(pointerId); } catch(err){}
+				pointerId = null;
+				row.style.transition = '';
+				const dx = currentX - startX;
+				if (dx <= -threshold) {
+					try { closeAllSwipes(); } catch (e) {}
+					li.classList.add('swipe-left'); row.style.transform = `translateX(-${rowReveal}px)`;
+					if (delBtn) { delBtn.style.transform = `translateX(${delEnd}px)`; delBtn.style.opacity = '1'; }
+				} else {
+					li.classList.remove('swipe-left'); row.style.transform = 'translateX(0)';
+					if (delBtn) { delBtn.style.transform = `translateX(${delStart}px)`; delBtn.style.opacity = '0'; }
+					li._swipeMoved = false;
+				}
+				startX = currentX = 0;
+			}
+			li.addEventListener('touchstart', onStart, { passive: false });
+			li.addEventListener('touchmove', onMove, { passive: false });
+			li.addEventListener('touchend', onEnd);
+			li.addEventListener('pointerdown', (e) => { onStart(e); });
+			li.addEventListener('pointermove', (e) => { onMove(e); });
+			li.addEventListener('pointerup', (e) => { onEnd(e); });
+			li.addEventListener('click', (e) => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; return; } if (li.classList.contains('swipe-left')) { li.classList.remove('swipe-left'); row.style.transform = 'translateX(0)'; } });
+		}
+
+		function deleteLesson(lessonId) {
+			if (!currentSubject) return alert('No subject selected.');
+			const name = (currentSubject.lessons.find(l => l.id === lessonId) || {}).title || 'this lesson';
+			if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+			const idx = currentSubject.lessons.findIndex(l => l.id === lessonId);
+			if (idx === -1) return alert('Lesson not found.');
+			currentSubject.lessons.splice(idx, 1);
+			saveLessonsToStorage();
+			renderLessons();
+			if (currentLesson && currentLesson.id === lessonId) { currentLesson = null; showView('view-lessons'); }
 		}
 
 		function renderContent() {
@@ -1205,7 +1639,25 @@
 		}
 
 		// Profile handling
-		let profile = { name: 'Guest User', email: '' };
+			let profile = { name: 'Guest User', email: '' };
+			window.profile = profile;
+
+		// Apply Firebase auth user to local profile and UI
+		function applyFirebaseUser(user) {
+			if (!user) {
+				// signed out
+				profile = { name: 'Guest User', email: '' };
+				try { localStorage.removeItem('lagro_profile'); } catch(e){}
+				updateProfileUI();
+				return;
+			}
+			// build profile from Firebase user
+			const display = user.displayName || (user.email ? user.email.split('@')[0].replace(/[._\-]/g,' ') : 'User');
+			profile = { uid: user.uid || null, name: display, email: user.email || '' };
+			try { localStorage.setItem('lagro_profile', JSON.stringify(profile)); } catch (e) {}
+			window.profile = profile;
+			updateProfileUI();
+		}
 
 		function loadProfile() {
 			try {
@@ -1224,6 +1676,7 @@
 					}
 				}
 			} catch(e) {}
+			window.profile = profile;
 			updateProfileUI();
 		}
 
@@ -1235,7 +1688,7 @@
 			if (elAvatar) {
 				const parts = (profile.name || 'U').split(' ').filter(Boolean);
 				const initials = parts.length === 1 ? parts[0].slice(0,1) : (parts[0][0] + (parts[1] ? parts[1][0] : ''));
-				elAvatar.innerText = (initials || 'U').toUpperCase();
+				elAvatar.innerText = (initials||'U').toUpperCase();
 			}
 			if (!menu) return;
 			// Build dynamic menu depending on login state
@@ -1249,8 +1702,7 @@
 			} else {
 				menu.innerHTML = `
 					<div class="p-3 border-b text-sm text-slate-700">Not signed in</div>
-					<button onclick="openLoginModal()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Sign In</button>
-					<button onclick="openProfileModal()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Create Profile</button>
+					<button onclick="openLoginModal()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Sign In (email)</button>
 					<button onclick="goHome()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">Dashboard</button>
 				`;
 			}
@@ -1292,7 +1744,7 @@
 				const rec = profile.gpaRecords || {};
 				const keys = Object.keys(rec);
 				if (!keys.length) { listEl.innerHTML = '<em>No lesson GPAs yet.</em>'; return; }
-				let html = '<ul class="list-disc pl-4">';
+				let html = '<ul class="pl-0">';
 				keys.forEach(k => { html += `<li>${escapeHtml(k)}: <strong>${(rec[k]||0).toFixed(2)}</strong></li>`; });
 				html += '</ul>';
 				listEl.innerHTML = html;
@@ -1311,6 +1763,10 @@
 		function showProfilePage() {
 			renderProfilePage();
 			showView('view-profile');
+			// when showing profile page, hide add-subject modal and add menus
+			try { closeAddSubjectModal(); } catch(e){}
+			try { closeAddMenu(); } catch(e){}
+			try { closeAddLessonModal(); } catch(e){}
 			// layout handled globally by showView()/adjustForHeader()
 			// update breadcrumbs: show Profile as current
 			document.getElementById('crumb-subject-sep').classList.remove('hidden');
@@ -1485,6 +1941,41 @@
 		function openLoginModal() {
 			const m = document.getElementById('login-modal'); if (!m) return; m.classList.remove('hidden'); m.classList.add('flex');
 			const pm = document.getElementById('profile-menu'); if (pm) pm.classList.add('hidden');
+			// If a Firebase-authenticated profile exists and was signed in via a provider like Google,
+			// reflect that in the login modal: prefill email and disable password entry since
+			// Google accounts don't expose passwords to the app.
+			try {
+				const authProvider = localStorage.getItem('lagro_auth_provider');
+				const profRaw = localStorage.getItem('lagro_profile');
+				if (profRaw) {
+					const prof = JSON.parse(profRaw || '{}');
+					const emailEl = document.getElementById('login-email');
+					const pwdEl = document.getElementById('login-password');
+					const submitBtn = document.querySelector('#login-modal button[type=submit]');
+					if (emailEl && prof.email) emailEl.value = prof.email || '';
+					if (authProvider === 'google.com') {
+						if (pwdEl) { pwdEl.value = ''; pwdEl.disabled = true; pwdEl.placeholder = 'Password managed by Google'; }
+						if (submitBtn) submitBtn.innerText = `Signed in with Google`;
+					} else {
+						if (pwdEl) { pwdEl.disabled = false; pwdEl.placeholder = ''; }
+						if (submitBtn) submitBtn.innerText = `Sign in`;
+					}
+				}
+			} catch (e) {}
+		}
+
+		// Allow user to override provider UI and use email/password entry
+		function enableEmailPasswordMode() {
+			try {
+				const pwdEl = document.getElementById('login-password');
+				const toggle = document.getElementById('login-toggle-emailpw');
+				const submitBtn = document.querySelector('#login-modal button[type=submit]');
+				if (pwdEl) { pwdEl.disabled = false; pwdEl.placeholder = ''; }
+				if (toggle) toggle.classList.add('hidden');
+				if (submitBtn) submitBtn.innerText = 'Sign in';
+				// clear stored provider so modal won't re-disable password automatically
+				try { localStorage.removeItem('lagro_auth_provider'); } catch(e){}
+			} catch (e) { console.warn('enableEmailPasswordMode error', e); }
 		}
 
 		function closeLoginModal() { const m = document.getElementById('login-modal'); if (!m) return; m.classList.add('hidden'); m.classList.remove('flex'); }
@@ -1493,44 +1984,128 @@
 			const email = (document.getElementById('login-email')||{}).value || '';
 			const pwd = (document.getElementById('login-password')||{}).value || '';
 			if (!email || !pwd) { alert('Please enter email and password (demo).'); return; }
-			// Demo-only: create profile from email
-			const nameGuess = email.split('@')[0].replace(/[._\-]/g,' ').replace(/\d+/g,' ');
-			profile = { name: (nameGuess.split(' ').map(s=>s[0]?.toUpperCase()+s.slice(1)).join(' ') || email), email: email };
+			// If Firebase sign-in is available, use it, otherwise fallback to demo behavior
+			const errEl = document.getElementById('login-error'); if (errEl) { errEl.classList.add('hidden'); errEl.innerText = ''; }
+			if (window.firebaseSignIn) {
+				window.firebaseSignIn(email, pwd).then(user => {
+					// apply firebase user to UI
+					try { applyFirebaseUser && applyFirebaseUser(user); } catch(e){}
+					closeLoginModal();
+				}).catch(err => {
+					console.warn('SignIn error', err);
+					const code = err && err.code ? err.code : null;
+					let msg = err && err.message ? err.message : 'Sign in failed.';
+					if (code === 'auth/operation-not-allowed') msg = 'Email/password sign-in is not enabled for this Firebase project. Please enable it in the Firebase Console → Authentication → Sign-in method.';
+					if (errEl) { errEl.innerText = msg; errEl.classList.remove('hidden'); }
+				});
+				return;
+			}
+			// Sign-in not configured: inform user (profile creation disabled)
+			alert('Sign-in is not configured for this demo.');
+			return;
+		}
+
+		function performSignUp() {
+			const email = (document.getElementById('login-email')||{}).value || '';
+			const pwd = (document.getElementById('login-password')||{}).value || '';
+			if (!email || !pwd) { alert('Please enter email and password to create an account.'); return; }
+			const errEl = document.getElementById('login-error'); if (errEl) { errEl.classList.add('hidden'); errEl.innerText = ''; }
+			if (window.firebaseSignUp) {
+				window.firebaseSignUp(email, pwd).then(user => {
+					try { applyFirebaseUser && applyFirebaseUser(user); } catch(e){}
+					closeLoginModal();
+				}).catch(err => {
+					console.warn('SignUp error', err);
+					const code = err && err.code ? err.code : null;
+					let msg = err && err.message ? err.message : 'Sign up failed.';
+					if (code === 'auth/operation-not-allowed') msg = 'Email/password sign-up is not enabled for this Firebase project. Enable it in Firebase Console → Authentication → Sign-in method.';
+					if (code === 'auth/email-already-in-use') msg = 'This email is already in use. Try signing in instead.';
+					if (errEl) { errEl.innerText = msg; errEl.classList.remove('hidden'); }
+				});
+				return;
+			}
+			// Sign-up not configured: inform user (profile creation disabled)
+			alert('Sign-up is not configured in this build.');
+			return;
+		}
+
+		function performPasswordResetPrompt() {
+			const email = (document.getElementById('login-email')||{}).value || '';
+			let target = email;
+			if (!target) target = prompt('Enter your email to reset password:');
+			if (!target) return alert('Email is required to reset password.');
+			if (window.firebaseSendPasswordReset) {
+				window.firebaseSendPasswordReset(target).then(()=> alert('Password reset sent. Check your email.')).catch(e=> alert('Reset failed: '+(e.message||e)));
+			} else if (window.firebaseAuth && window.firebaseAuth.sendPasswordResetEmail) {
+				// try if firebase auth object exposed (unlikely)
+				try { window.firebaseAuth.sendPasswordResetEmail(target).then(()=>alert('Password reset sent.')).catch(e=>alert('Reset failed: '+(e.message||e))); } catch(e){ alert('Password reset not available in this build.'); }
+			} else {
+				alert('Password-reset not configured for this demo. In production this would send a reset email to ' + target);
+			}
+		}
+
+		function continueAsGuest() {
+			profile = { name: 'Guest User', email: '' };
 			try { localStorage.setItem('lagro_profile', JSON.stringify(profile)); } catch (e) {}
-			updateProfileUI(); closeLoginModal();
+			updateProfileUI();
+			closeLoginModal();
+		}
+
+		function showEmailForm() {
+			document.getElementById('login-choices')?.classList.add('hidden');
+			document.getElementById('login-email-form')?.classList.remove('hidden');
+		}
+
+		async function signInWithGoogleHandler() {
+			if (!window.firebaseSignInWithGoogle) return alert('Google sign-in not configured');
+			try {
+				const user = await window.firebaseSignInWithGoogle();
+				if (user) {
+					try { applyFirebaseUser && applyFirebaseUser(user); } catch (e) {}
+					closeLoginModal();
+				}
+			} catch (err) {
+				console.warn('Google sign-in error', err);
+				alert('Google sign-in failed: ' + (err && err.message ? err.message : err));
+			}
 		}
 
 		function toggleProfileMenu(e) {
 			e.stopPropagation();
+			// close other overlays to avoid overlap
+			try { closeAddMenu(); } catch(e){}
+			try { closeAddSubjectModal(); } catch(e){}
+			try { closeAddLessonModal(); } catch(e){}
 			const m = document.getElementById('profile-menu');
-			if (m) m.classList.toggle('hidden');
+			if (m) {
+				m.style.zIndex = 7000;
+				m.classList.toggle('hidden');
+			}
 		}
 
-		document.addEventListener('click', () => { const m = document.getElementById('profile-menu'); if (m) m.classList.add('hidden'); });
+		document.addEventListener('click', (e) => { try { closeAllSwipes(); } catch (err) {} const m = document.getElementById('profile-menu'); if (m) m.classList.add('hidden'); const am = document.getElementById('add-menu'); if (am) am.classList.add('hidden'); });
+		// Profile modal handlers removed
 
-		function openProfileModal() {
-			const m = document.getElementById('profile-modal');
-			if (!m) return;
-			document.getElementById('input-name').value = profile.name || '';
-			document.getElementById('input-email').value = profile.email || '';
-			m.classList.remove('hidden'); m.classList.add('flex');
-			const pm = document.getElementById('profile-menu'); if (pm) pm.classList.add('hidden');
+		// Apply a Firebase user object to the UI (called from module onAuthStateChanged)
+		function applyFirebaseUser(user) {
+			if (!user) return;
+			profile = { name: user.displayName || (user.email ? user.email.split('@')[0] : 'User'), email: user.email || '' };
+			// store provider info so UI can adapt (e.g., disable password field when signed in via Google)
+			try { localStorage.setItem('lagro_profile', JSON.stringify(profile)); } catch (e) {}
+			try {
+				const provider = (user.providerData && user.providerData[0] && user.providerData[0].providerId) || null;
+				if (provider) localStorage.setItem('lagro_auth_provider', provider);
+			} catch (e) {}
+			updateProfileUI();
 		}
 
-		function closeProfileModal() {
-			const m = document.getElementById('profile-modal'); if (!m) return; m.classList.add('hidden'); m.classList.remove('flex');
-		}
-
-		function saveProfile() {
-			const n = document.getElementById('input-name').value.trim();
-			const e = document.getElementById('input-email').value.trim();
-			profile.name = n || profile.name;
-			profile.email = e || profile.email;
-			try { localStorage.setItem('lagro_profile', JSON.stringify(profile)); } catch (err) { }
-			updateProfileUI(); closeProfileModal();
-		}
+		// saveProfile removed; profile editing is not available in this build
 
 		function logout() {
+			// If firebase sign out available, call it
+			if (window.firebaseSignOut) {
+				window.firebaseSignOut().catch(e=>console.warn('SignOut failed', e));
+			}
 			try { localStorage.removeItem('lagro_profile'); } catch (e) {}
 			profile = { name: 'Guest User', email: '' };
 			updateProfileUI();
@@ -1571,6 +2146,13 @@
 				const lessonGpa = computeLessonGPA(percent);
 				// update profile records (store percent and gpa)
 				updateProfileGPA(currentQuizState.lessonId, lessonGpa, percent);
+
+				// persist score to backend if user is signed-in and Firestore helper exists
+				try {
+					if (window.firestore && window.firestore.saveUserScore && profile && profile.uid) {
+						window.firestore.saveUserScore(profile.uid, currentQuizState.lessonId, percent).catch && window.firestore.saveUserScore(profile.uid, currentQuizState.lessonId, percent).catch(e=>console.warn('saveUserScore failed', e));
+					}
+				} catch(e) { console.warn('persist score failed', e); }
 				const res = document.getElementById('quiz-result');
 				if (res) res.innerHTML = `<div class="p-4 rounded-md bg-white border text-slate-700 shadow-sm">You scored <strong>${percent}%</strong>. Lesson GPA: <strong>${lessonGpa.toFixed(2)}</strong>. Overall GPA: <strong>${(profile.gpa || 0).toFixed(2)}</strong></div>`;
 			}
@@ -1608,7 +2190,514 @@
 			updateProfileUI();
 		}
 
-		document.addEventListener('DOMContentLoaded', () => { loadProfile(); renderSubjects(); initHeaderScroll(); adjustForHeader(); });
+		// --- Add Lesson modal handlers and persistence for user-created lessons ---
+		let __addLessonFiles = []; // { name, type, dataUrl }
+
+		function openAddLessonModal() {
+			// require Google sign-in (accept users identified by uid or email)
+			console.log('openAddLessonModal profile check', profile, window.profile);
+			if (!profile || (!profile.uid && !profile.email)) {
+				if (confirm('You must sign in with Google to add lessons. Sign in now?')) {
+					if (window.firebaseSignInWithGoogle) {
+						window.firebaseSignInWithGoogle().then(u=>{ try { applyFirebaseUser && applyFirebaseUser(u); openAddLessonModal(); } catch(e){} }).catch(e=>{ alert('Sign-in failed'); });
+					} else { alert('Google sign-in not available'); }
+				}
+				return;
+			}
+			const m = document.getElementById('add-lesson-modal'); if (!m) return;
+			// ensure subject modal is closed and this modal is a top-level child
+			try { closeAddSubjectModal(); if (m.parentElement !== document.body) document.body.appendChild(m); m.style.zIndex = 5000; } catch(e){}
+			populateAddLessonSubjects();
+			// reset inputs and previews
+			const titleIn = document.getElementById('add-lesson-title-input'); if (titleIn) titleIn.value = '';
+			const descIn = document.getElementById('add-lesson-desc-input'); if (descIn) descIn.value = '';
+			__addLessonFiles = [];
+			const previewsEl = document.getElementById('add-lesson-file-previews'); if (previewsEl) previewsEl.innerHTML = '';
+			const previewPanel = document.getElementById('add-lesson-preview'); if (previewPanel) { previewPanel.classList.add('hidden'); }
+			const summaryEl = document.getElementById('add-lesson-preview-summary'); if (summaryEl) summaryEl.innerHTML = '';
+			const chartWrap = document.getElementById('add-lesson-preview-chart-wrap'); if (chartWrap) { chartWrap.innerHTML = ''; try { if (window.__addLessonPreviewChart) { window.__addLessonPreviewChart.destroy(); window.__addLessonPreviewChart = null; } } catch(e){} }
+			const cardsEl = document.getElementById('add-lesson-preview-cards'); if (cardsEl) cardsEl.innerHTML = '';
+			const metaEl = document.getElementById('add-lesson-preview-meta'); if (metaEl) metaEl.innerText = '';
+			const fileInput = document.getElementById('add-lesson-files'); if (fileInput) fileInput.value = '';
+			m.classList.remove('hidden'); m.classList.add('flex');
+			// attach drop handlers
+			setTimeout(() => {
+				const dz = document.getElementById('add-lesson-dropzone');
+				if (dz) {
+					dz.ondragover = (ev)=>{ ev.preventDefault(); dz.classList.add('ring-2'); };
+					dz.ondragleave = (ev)=>{ dz.classList.remove('ring-2'); };
+					dz.ondrop = (ev)=>{ dz.classList.remove('ring-2'); handleDrop(ev); };
+					dz.onclick = ()=> document.getElementById('add-lesson-files').click();
+				}
+			}, 50);
+		}
+
+	// --- Add Subject modal handlers ---
+	function toggleAddMenu(e) { try { e && e.stopPropagation(); const am = document.getElementById('add-menu'); if (!am) return; am.classList.toggle('hidden'); } catch(e){} }
+
+	function closeAddMenu() { try { const am = document.getElementById('add-menu'); if (am) am.classList.add('hidden'); } catch(e){} }
+
+	function openAddSubjectModal() {
+		// require Google sign-in (accept users identified by uid or email)
+		console.log('openAddSubjectModal profile check', profile, window.profile);
+		if (!profile || (!profile.uid && !profile.email)) {
+			if (confirm('You must sign in with Google to add subjects. Sign in now?')) {
+				if (window.firebaseSignInWithGoogle) {
+					window.firebaseSignInWithGoogle().then(u=>{ try { applyFirebaseUser && applyFirebaseUser(u); openAddSubjectModal(); } catch(e){} }).catch(e=>{ alert('Sign-in failed'); });
+				} else { alert('Google sign-in not available'); }
+			}
+			return;
+		}
+		// ensure the Add Lesson modal is hidden so the subject modal sits above it cleanly
+		try { closeAddLessonModal(); } catch(e){}
+		closeAddMenu();
+		// hide profile UI (menu or profile page) so Add Subject is the only visible overlay
+		try { const pm = document.getElementById('profile-menu'); if (pm) pm.classList.add('hidden'); } catch(e){}
+		try { const vp = document.getElementById('view-profile'); if (vp) vp.classList.add('hidden'); } catch(e){}
+		const m = document.getElementById('add-subject-modal'); if (!m) return;
+		// ensure modal is top-level so stacking contexts don't trap it
+		try { if (m.parentElement !== document.body) document.body.appendChild(m); m.style.zIndex = 6000; } catch(e){}
+			const t = document.getElementById('add-subject-title'); if (t) { t.value = ''; }
+			const d = document.getElementById('add-subject-desc'); if (d) d.value = '';
+			const ic = document.getElementById('add-subject-icon'); if (ic) ic.value = '';
+		m.classList.remove('hidden'); m.classList.add('flex');
+		// focus title for quick entry
+		try { setTimeout(()=>{ const inp = document.getElementById('add-subject-title'); if (inp) inp.focus(); }, 50); } catch(e){}
+	}
+
+	function closeAddSubjectModal() {
+		const m = document.getElementById('add-subject-modal'); if (!m) return; m.classList.add('hidden'); m.classList.remove('flex');
+	}
+
+	function submitAddSubject() {
+		console.log('submitAddSubject profile', profile, window.profile);
+		if (!profile || (!profile.uid && !profile.email)) { alert('Please sign in with Google to add subjects.'); return; }
+		const t = (document.getElementById('add-subject-title')||{}).value || '';
+		const d = (document.getElementById('add-subject-desc')||{}).value || '';
+		if (!t.trim()) { alert('Please enter a title for the subject.'); return; }
+		const id = t.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'').slice(0,40) || ('subject-' + Date.now());
+		if (subjects[id]) { alert('A subject with that title already exists. Pick another title.'); return; }
+		// read optional icon input (emoji or image URL)
+		const iconInput = (document.getElementById('add-subject-icon')||{}).value || '';
+		const iconVal = iconInput.trim() ? iconInput.trim() : '📚';
+		const createdBy = (profile && profile.name) ? profile.name : 'Guest';
+		// Try server-side creation first
+		fetch('/api/subjects', {
+			method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id, title: t.trim(), icon: iconVal, desc: d.trim(), createdBy })
+		}).then(async (r) => {
+			if (!r.ok) {
+				// fallback to client-side only
+				subjects[id] = { id: id, title: t.trim(), icon: iconVal, color: 'bg-emerald-50 text-lagro-green border-emerald-200', desc: d.trim(), lessons: [] };
+				try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
+				renderSubjects(); selectSubject(id); closeAddSubjectModal();
+				return;
+			}
+			const j = await r.json();
+			if (j && j.subject) {
+				subjects[j.subject.id] = j.subject;
+				try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
+				renderSubjects(); selectSubject(j.subject.id); closeAddSubjectModal();
+			} else {
+				// unexpected response: fallback
+				subjects[id] = { id: id, title: t.trim(), icon: iconVal, color: 'bg-emerald-50 text-lagro-green border-emerald-200', desc: d.trim(), lessons: [] };
+				try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
+				renderSubjects(); selectSubject(id); closeAddSubjectModal();
+			}
+		}).catch((err)=>{
+			// server not available — fallback to client-only
+			subjects[id] = { id: id, title: t.trim(), icon: iconVal, color: 'bg-emerald-50 text-lagro-green border-emerald-200', desc: d.trim(), lessons: [] };
+			try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
+			renderSubjects(); selectSubject(id); closeAddSubjectModal();
+		});
+	}
+
+		function closeAddLessonModal() {
+			const m = document.getElementById('add-lesson-modal'); if (!m) return;
+			// clear preview and file state when closing
+			const previewPanel = document.getElementById('add-lesson-preview'); if (previewPanel) { previewPanel.classList.add('hidden'); }
+			const previewsEl = document.getElementById('add-lesson-file-previews'); if (previewsEl) previewsEl.innerHTML = '';
+			const summaryEl = document.getElementById('add-lesson-preview-summary'); if (summaryEl) summaryEl.innerHTML = '';
+			const chartWrap = document.getElementById('add-lesson-preview-chart-wrap'); if (chartWrap) { chartWrap.innerHTML = ''; try { if (window.__addLessonPreviewChart) { window.__addLessonPreviewChart.destroy(); window.__addLessonPreviewChart = null; } } catch(e){} }
+			const cardsEl = document.getElementById('add-lesson-preview-cards'); if (cardsEl) cardsEl.innerHTML = '';
+			const metaEl = document.getElementById('add-lesson-preview-meta'); if (metaEl) metaEl.innerText = '';
+			const fileInput = document.getElementById('add-lesson-files'); if (fileInput) fileInput.value = '';
+			__addLessonFiles = [];
+			m.classList.add('hidden'); m.classList.remove('flex');
+		}
+
+		function populateAddLessonSubjects() {
+			const sel = document.getElementById('add-lesson-subject'); if (!sel) return; sel.innerHTML = '';
+			Object.values(subjects).forEach(s => {
+				const opt = document.createElement('option'); opt.value = s.id; opt.innerText = s.title; sel.appendChild(opt);
+			});
+			// Ensure there's always a selectable subject — default to first or create 'General'
+			if (!sel.options.length) {
+				subjects['general'] = subjects['general'] || { id: 'general', title: 'General', lessons: [] };
+				const opt = document.createElement('option'); opt.value = 'general'; opt.innerText = 'General'; sel.appendChild(opt);
+			} else {
+				// prefer currently-selected subject if available
+				if (typeof currentSubject === 'object' && currentSubject && currentSubject.id) {
+					const found = Array.from(sel.options).find(o => o.value === currentSubject.id);
+					if (found) sel.value = currentSubject.id;
+					else sel.value = sel.options[0].value;
+				} else {
+					sel.value = sel.options[0].value;
+				}
+			}
+		}
+
+		function handleAddLessonFiles(e) {
+			const files = Array.from(e.target.files || []);
+			const previews = document.getElementById('add-lesson-file-previews'); if (!previews) return;
+			previews.innerHTML = '';
+			__addLessonFiles = [];
+			files.forEach((f, idx) => {
+				const reader = new FileReader();
+				reader.onload = function(ev) {
+					const data = ev.target.result;
+					// store original File plus dataUrl for preview
+					__addLessonFiles.push({ file: f, name: f.name, type: f.type, dataUrl: data });
+					let node;
+					if (f.type.startsWith('image/')) {
+						node = document.createElement('img'); node.src = data; node.className = 'w-full h-24 object-cover rounded';
+					} else {
+						node = document.createElement('div'); node.className = 'p-2 bg-slate-100 rounded text-sm text-slate-300'; node.innerText = f.name;
+					}
+					const wrapper = document.createElement('div'); wrapper.className = 'overflow-hidden rounded'; wrapper.appendChild(node);
+					previews.appendChild(wrapper);
+				};
+				reader.readAsDataURL(f);
+			});
+			// after files are loaded for preview, run auto-generation preview
+			setTimeout(() => { generatePreview(); }, 60);
+		}
+
+		// Fallback/simple summary generator: take the first N sentences
+		function generateSummaryFromText(text, sentences = 3) {
+			if (!text) return '';
+			try {
+				const s = text.replace(/\s+/g, ' ').trim();
+				const parts = s.split(/(?<=[\.\?!])\s+/).filter(Boolean);
+				return parts.slice(0, sentences).join(' ');
+			} catch (e) { return text.slice(0, Math.min(300, text.length)); }
+		}
+
+		async function generatePreview() {
+			const preview = document.getElementById('add-lesson-preview'); if (!preview) return;
+			const summaryEl = document.getElementById('add-lesson-preview-summary');
+			const chartWrap = document.getElementById('add-lesson-preview-chart-wrap');
+			const cardsEl = document.getElementById('add-lesson-preview-cards');
+			const metaEl = document.getElementById('add-lesson-preview-meta');
+			preview.classList.add('hidden'); summaryEl.innerHTML=''; chartWrap.innerHTML=''; cardsEl.innerHTML=''; metaEl.innerText='';
+			if (!__addLessonFiles || __addLessonFiles.length===0) return;
+			preview.classList.remove('hidden');
+			metaEl.innerText = 'Analyzing files...';
+			let aggText = '';
+			for (const f of __addLessonFiles) {
+				try { const t = await extractTextFromFile(f.file, f.type); if (t && t.trim()) aggText += '\n' + t; } catch(e){console.warn(e)}
+			}
+			if (!aggText.trim()) { summaryEl.innerText = 'No readable text was found in the uploaded files.'; metaEl.innerText = '';
+				return; }
+			// Try AI summarizer if API key available, otherwise fallback to local keypoint generator
+			let keypointsHtml = '';
+			try {
+				const cfg = (window.getLagroConfig && window.getLagroConfig()) || {};
+				if (cfg.GOOGLE_GENERATIVE_API_KEY) {
+					const aiHtml = await aiGenerateKeypoints(aggText, cfg.GOOGLE_GENERATIVE_API_KEY).catch(()=>null);
+					if (aiHtml) keypointsHtml = aiHtml;
+				}
+			} catch(e) { console.warn('AI keypoint generation failed', e); }
+			if (!keypointsHtml) keypointsHtml = generateKeypointsFromText(aggText);
+			// also keep a short summary
+			const summary = generateSummaryFromText(aggText, 3);
+			summaryEl.innerHTML = `<div class="font-semibold mb-2">Summary</div><div>${escapeHtml(summary)}</div>`;
+			// attach organized keypoints to preview (below summary)
+			const kpWrap = document.createElement('div'); kpWrap.className = 'mt-4'; kpWrap.innerHTML = `<div class="font-semibold mb-2">Keypoints</div>` + keypointsHtml;
+			summaryEl.appendChild(kpWrap);
+			// cache generated HTML so submit can reuse without reprocessing files
+			window.__addLessonGeneratedHtml = keypointsHtml;
+			// chart preview
+			const chartObj = generateChartFromText(aggText);
+			if (chartObj) {
+				chartWrap.innerHTML = '<canvas id="add-lesson-preview-chart"></canvas>';
+				const ctx = document.getElementById('add-lesson-preview-chart').getContext('2d');
+				try { if (window.__addLessonPreviewChart) window.__addLessonPreviewChart.destroy(); } catch(e){}
+				window.__addLessonPreviewChart = new Chart(ctx, { type: chartObj.type || 'bar', data: { labels: chartObj.labels, datasets: [{ label: chartObj.label||'', data: chartObj.data, backgroundColor: '#059669' }] }, options: { responsive: true, maintainAspectRatio: false } });
+			}
+			// flashcards sample
+			const flashcards = generateFlashcardsFromText(aggText, 4);
+			if (flashcards && flashcards.length) {
+				cardsEl.innerHTML = '<div class="font-semibold mb-2">Sample Flashcards</div>';
+				flashcards.slice(0,3).forEach(c => {
+					const el = document.createElement('div'); el.className='p-2 bg-white rounded border'; el.innerHTML = `<strong>${escapeHtml(c.front)}</strong><div class="text-xs text-slate-500 mt-1">${escapeHtml(c.back)}</div>`; cardsEl.appendChild(el);
+				});
+			}
+			// quiz meta
+			const quiz = generateQuizFromText(aggText, 6);
+			metaEl.innerText = `Detected ${__addLessonFiles.length} file(s) · Generated ${quiz.length} quiz questions · ${flashcards.length} flashcards`;
+		}
+
+		function handleDrop(e) {
+			e.preventDefault(); e.stopPropagation();
+			const files = Array.from(e.dataTransfer.files || []);
+			if (!files.length) return;
+			const input = document.getElementById('add-lesson-files');
+			// set files to input (may be read-only in some browsers) — call handler directly
+			handleAddLessonFiles({ target: { files } });
+		}
+
+		async function submitAddLesson() {
+			const subj = document.getElementById('add-lesson-subject').value;
+			const title = (document.getElementById('add-lesson-title-input')||{}).value.trim();
+			const desc = (document.getElementById('add-lesson-desc-input')||{}).value.trim();
+			if (!subj || !title) { alert('Please choose a subject and enter a lesson title.'); return; }
+			const id = 'u' + Date.now();
+			// Extract text from uploaded files (OCR / PDF / text)
+			let extractedText = '';
+			for (const f of __addLessonFiles) {
+				try {
+					const t = await extractTextFromFile(f.file, f.type);
+					if (t && t.trim()) extractedText += '\n' + t;
+				} catch (e) { console.warn('Extract failed', e); }
+			}
+
+			// Merge description into extracted text for content generation
+			if (desc) extractedText = desc + '\n' + extractedText;
+
+			// public flag and summary generation
+			const isPublic = !!(document.getElementById('add-lesson-public') && document.getElementById('add-lesson-public').checked);
+			let summary = '';
+			if (extractedText && extractedText.trim().length > 30) summary = generateSummaryFromText(extractedText, 4);
+
+			// Generate visuals, quiz, flashcards from extractedText
+			let chartObj = null;
+			let quizArr = [];
+			let flashcards = [];
+			if (extractedText && extractedText.trim().length > 30) {
+				chartObj = generateChartFromText(extractedText);
+				quizArr = generateQuizFromText(extractedText, 6);
+				flashcards = generateFlashcardsFromText(extractedText, 20);
+			}
+
+			// store attachments metadata; include image dataUrls so original letter images can be shown in `Read`
+			const attachments = __addLessonFiles.map(f => ({ name: f.name, type: f.type, dataUrl: f.dataUrl || null }));
+			// Build a readable block for the Read view using same classes as other lessons
+			const titleHtml = `<h3 class="text-2xl font-serif font-bold text-lagro-green mb-2">${escapeHtml(title)}</h3>`;
+			const descHtml = desc ? `<p class="text-slate-500 mb-4">${escapeHtml(desc)}</p>` : '';
+			let contentBody = '';
+			// Prefer the generated structured HTML from preview if available
+			if (window.__addLessonGeneratedHtml && window.__addLessonGeneratedHtml.trim()) {
+				contentBody = window.__addLessonGeneratedHtml;
+			} else if (extractedText && extractedText.trim().length > 0) {
+				// split into paragraphs by blank lines and preserve single-line breaks within paragraphs
+				const safe = escapeHtml(extractedText).replace(/\r/g,'');
+				const parts = safe.split(/\n\s*\n/).map(p => p.replace(/\n/g,' '));
+				contentBody = parts.map(p => `<p class="mb-4">${p}</p>`).join('');
+			}
+			// Use the shared `lesson-content` class so formatting and theme match other lessons
+			const readTextHtml = `<div class="lesson-content">${titleHtml}${descHtml}${contentBody}</div>`;
+			const lesson = { id, title, desc: desc || '', public: isPublic, attachments: attachments, content: { read: readTextHtml, summary: summary, chart: chartObj, quiz: quizArr } };
+			// register flashcards in preset map so renderFlashcards picks them up
+			if (flashcards && flashcards.length) presetFlashcards[id] = flashcards;
+
+			if (!subjects[subj]) subjects[subj] = { id: subj, title: subj, lessons: [] };
+			subjects[subj].lessons.push(lesson);
+
+			// navigate to the subject's lesson list so the user sees the newly created lesson
+			currentSubject = subjects[subj];
+			renderLessons();
+			showView('view-lessons');
+			updateBreadcrumbs();
+			// If user marked as public and cloud is available, upload to Firestore (and optionally generate enhanced AI lesson server-side)
+			if (isPublic && window.uploadLessonToCloud) {
+				try {
+					document.getElementById('add-lesson-preview-meta').innerText = 'Sharing to community...';
+					window.uploadLessonToCloud(Object.assign({}, lesson, { extractedText }), subj).then(() => {
+						document.getElementById('add-lesson-preview-meta').innerText = 'Shared to community.';
+					}).catch(e=>{ console.warn('Cloud upload failed', e); document.getElementById('add-lesson-preview-meta').innerText = 'Share failed.'; });
+				} catch (e) { console.warn(e); }
+			}
+			// persist user-created lessons
+			saveUserLessons();
+			// refresh UI
+			if (currentSubject && currentSubject.id === subj) renderLessons();
+			alert('Lesson created with generated visuals, quiz and flashcards. You can view it in the selected subject.');
+			closeAddLessonModal();
+		}
+
+		function saveUserLessons() {
+			try {
+				const out = {};
+				Object.keys(subjects).forEach(k => { out[k] = (subjects[k].lessons || []).filter(l => String(l.id).startsWith('u')); });
+				localStorage.setItem('lagro_user_lessons_v1', JSON.stringify(out));
+			} catch (e) { console.warn('Save failed', e); }
+		}
+
+		function loadUserLessons() {
+			try {
+				const raw = localStorage.getItem('lagro_user_lessons_v1');
+				if (!raw) return;
+				const parsed = JSON.parse(raw || '{}');
+				Object.keys(parsed).forEach(sid => {
+					if (!subjects[sid]) subjects[sid] = { id: sid, title: sid, lessons: [] };
+					// append user-created lessons after existing lessons so new posts appear at the bottom
+					subjects[sid].lessons = (subjects[sid].lessons || []).concat(parsed[sid] || []);
+				});
+			} catch (e) { console.warn('Load user lessons failed', e); }
+		}
+
+		// --- content generation helpers ---
+		function stripAndSplitWords(text) {
+			return (text || '').toLowerCase().replace(/[\d\W_]+/g, ' ').split(/\s+/).filter(Boolean);
+		}
+
+		function generateChartFromText(text) {
+			const stop = new Set(['the','and','to','of','a','in','is','for','that','with','as','on','are','by','an','be','or','it','this','from','which','at','we','can','has','have']);
+			const words = stripAndSplitWords(text).filter(w => !stop.has(w) && w.length > 2);
+			const freq = {};
+			words.forEach(w => freq[w] = (freq[w]||0) + 1);
+			const entries = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,8);
+			if (!entries.length) return null;
+			return { type: 'bar', labels: entries.map(e=>e[0]), data: entries.map(e=>e[1]), label: 'Top words', desc: 'Automatically generated word-frequency from uploaded material.' };
+		}
+
+		function generateQuizFromText(text, maxQuestions = 5) {
+			const sentences = (text.replace(/\s+/g,' ').split(/(?<=[\.\?!])\s+/) || []).filter(s => s.length > 40);
+			const words = stripAndSplitWords(text).filter(w => w.length > 3);
+			const uniq = Array.from(new Set(words));
+			const out = [];
+			for (let i=0;i<Math.min(maxQuestions, sentences.length);i++) {
+				const s = sentences[i];
+				const candidates = stripAndSplitWords(s).filter(w=>w.length>4);
+				let target = candidates.length ? candidates[Math.floor(candidates.length/2)] : null;
+				if (!target) continue;
+				const masked = s.replace(new RegExp('\\b'+target+'\\b','i'), '_____');
+				// build options
+				const wrongs = uniq.filter(w=>w !== target).sort(()=>Math.random()-0.5).slice(0,3);
+				const options = [target].concat(wrongs).sort(()=>Math.random()-0.5);
+				const correctIndex = options.indexOf(target);
+				out.push({ q: masked, options, a: correctIndex });
+			}
+			return out;
+		}
+
+		function generateFlashcardsFromText(text, maxCards = 15) {
+			const sentences = (text.replace(/\s+/g,' ').split(/(?<=[\.\?!])\s+/) || []).filter(s => s.length > 30);
+			const out = [];
+			for (let i=0;i<Math.min(maxCards, sentences.length);i++) {
+				const s = sentences[i].trim();
+				const front = s.length > 80 ? s.slice(0,80).trim() + '…' : s;
+				out.push({ front, back: s });
+			}
+
+			// Generate structured keypoints HTML from extracted text
+			function generateKeypointsFromText(text) {
+				if (!text || !text.trim()) return '<div class="text-sm text-slate-500">No keypoints generated.</div>';
+				// Normalize line breaks
+				const raw = text.replace(/\r/g,'').trim();
+				// Split into sections by two or more newlines
+				const sections = raw.split(/\n\s*\n/).filter(s => s.trim());
+				let out = '';
+				sections.forEach((sec, i) => {
+					const lines = sec.replace(/\n/g,' ').split(/(?<=[\.\?!])\s+/).map(s=>s.trim()).filter(Boolean);
+					// Heuristic: first short line can be a heading
+					let heading = null;
+					if (lines.length && lines[0].length < 80 && /[:\-]$/.test(lines[0]) ) {
+						heading = lines.shift().replace(/[:\-]+$/,'').trim();
+					} else if (lines.length && lines[0].split(' ').length <= 6 && /^[A-Z]/.test(lines[0])) {
+						heading = lines.shift();
+					}
+
+					// Use Google Generative API to produce structured keypoints (returns HTML string)
+					async function aiGenerateKeypoints(text, apiKey) {
+						if (!text || !text.trim() || !apiKey) return null;
+						// Build instruction to return JSON with sections and bullets
+						const prompt = `You are an expert educator. Given the following lesson text, extract concise, structured keypoints. Return only a JSON array named "sections" where each section has {"heading": string, "bullets": [string,...]}. Limit to 6 sections and up to 5 bullets each. Text:\n\n` + text.slice(0, 20000);
+						const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
+						try {
+							const url = `https://generativelanguage.googleapis.com/v2/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+							const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+							const j = await resp.json();
+							const txt = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
+							if (!txt) return null;
+							let parsed = null;
+							try { parsed = JSON.parse(txt); } catch(e) {
+								// try to salvage JSON inside text
+								const match = txt.match(/\{[\s\S]*\}/m);
+								if (match) {
+									try { parsed = JSON.parse(match[0]); } catch(e2) { parsed = null; }
+								}
+							}
+							if (!parsed) return null;
+							// Expect parsed to be { sections: [ {heading, bullets: []}, ... ] } or an array
+							const sections = Array.isArray(parsed.sections) ? parsed.sections : (Array.isArray(parsed) ? parsed : []);
+							let out = '';
+							sections.slice(0,6).forEach(sec=>{
+								if (!sec) return;
+								if (sec.heading) out += `<h4 class="text-md font-semibold text-lagro-green mt-3 mb-2">${escapeHtml(String(sec.heading))}</h4>`;
+								const bullets = Array.isArray(sec.bullets) ? sec.bullets.slice(0,5) : [];
+								if (bullets.length) {
+									out += '<ul class="list-disc pl-5 text-sm text-slate-300 mb-2">';
+									bullets.forEach(b => out += `<li>${escapeHtml(b)}</li>`);
+									out += '</ul>';
+								}
+							});
+							return out || null;
+						} catch (e) { console.warn('aiGenerateKeypoints error', e); return null; }
+					}
+					// build bullets by taking first 3 sentences from the section (split by sentence end)
+					const sentences = sec.replace(/\n/g,' ').split(/(?<=[\.\?!])\s+/).map(s=>s.trim()).filter(Boolean);
+					const bullets = sentences.slice(0,3);
+					if (heading) out += `<h4 class="text-md font-semibold text-lagro-green mt-3 mb-2">${escapeHtml(heading)}</h4>`;
+					if (bullets.length) {
+						out += '<ul class="list-disc pl-5 text-sm text-slate-300 mb-2">';
+						bullets.forEach(b => out += `<li>${escapeHtml(b)}</li>`);
+						out += '</ul>';
+					} else {
+						// fallback: render first 120 chars
+						out += `<p class="text-sm text-slate-300 mb-2">${escapeHtml(sec.slice(0,240))}${sec.length>240? '…':''}</p>`;
+					}
+				});
+				return out;
+			}
+			return out;
+		}
+
+		async function extractTextFromFile(file, mime) {
+			if (!file) return '';
+			mime = mime || (file.type || '');
+			// images -> OCR
+			if (mime.startsWith('image/')) {
+				try {
+					const res = await Tesseract.recognize(file, 'eng');
+					return res && res.data && res.data.text ? res.data.text : '';
+				} catch (e) { console.warn('OCR failed', e); return ''; }
+			}
+			// pdf -> extract text via pdf.js
+			if (mime === 'application/pdf') {
+				try {
+					const arrayBuf = await file.arrayBuffer();
+					const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+					let full = '';
+					for (let p=1;p<=pdf.numPages;p++) {
+						const page = await pdf.getPage(p);
+						const txt = await page.getTextContent();
+						const pageText = txt.items.map(i=>i.str).join(' ');
+						full += '\n' + pageText;
+					}
+					return full;
+				} catch (e) { console.warn('PDF extract failed', e); return ''; }
+			}
+			// plain text or others -> read as text when possible
+			if (mime.startsWith('text/') || mime === '') {
+				try { return await file.text(); } catch (e) { return ''; }
+			}
+			// fallback: try to read as data URL (for other types we already previewed)
+			return '';
+		}
+
+		document.addEventListener('DOMContentLoaded', () => { loadProfile(); loadUserLessons(); renderSubjects(); initHeaderScroll(); adjustForHeader(); });
 	</script>
 
 </body>
