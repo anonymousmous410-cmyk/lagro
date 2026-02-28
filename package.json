@@ -1,22 +1,15 @@
 {
-  "name": "lagro-reviewer-app",
+  "name": "lagro-reviewer-server",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
-    "firebase": "^10.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "chart.js": "^4.4.0",
-    "react-chartjs-2": "^5.2.0",
-    "lucide-react": "^0.230.0"
-  },
-  "devDependencies": {
-    "vite": "^5.0.0"
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^16.0.3",
+    "express": "^5.2.1"
   }
 }

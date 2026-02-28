@@ -106,6 +106,8 @@
 
 		// expose to window for usage in non-module code
 		window.uploadLessonToCloud = uploadLessonToCloud;
+		// expose AI summarization helper for non-module scripts
+		window.generateLessonWithAI = generateLessonWithAI;
 		window.firebaseSignIn = firebaseSignIn;
 		window.firebaseSignUp = firebaseSignUp;
 		window.firebaseSignOut = firebaseSignOut;
@@ -2212,6 +2214,8 @@
 			const titleIn = document.getElementById('add-lesson-title-input'); if (titleIn) titleIn.value = '';
 			const descIn = document.getElementById('add-lesson-desc-input'); if (descIn) descIn.value = '';
 			__addLessonFiles = [];
+			// clear any previously generated AI content
+			window.__addLessonGeneratedHtml = '';
 			const previewsEl = document.getElementById('add-lesson-file-previews'); if (previewsEl) previewsEl.innerHTML = '';
 			const previewPanel = document.getElementById('add-lesson-preview'); if (previewPanel) { previewPanel.classList.add('hidden'); }
 			const summaryEl = document.getElementById('add-lesson-preview-summary'); if (summaryEl) summaryEl.innerHTML = '';
@@ -2474,10 +2478,27 @@
 			let chartObj = null;
 			let quizArr = [];
 			let flashcards = [];
+			let aiGenerated = null;
 			if (extractedText && extractedText.trim().length > 30) {
 				chartObj = generateChartFromText(extractedText);
 				quizArr = generateQuizFromText(extractedText, 6);
 				flashcards = generateFlashcardsFromText(extractedText, 20);
+			}
+
+			// Attempt AI generation if available (may replace or augment generated assets)
+			if (extractedText && extractedText.trim().length > 30 && window.generateLessonWithAI) {
+				try {
+					aiGenerated = await window.generateLessonWithAI(extractedText);
+					if (aiGenerated) {
+						if (Array.isArray(aiGenerated.flashcards) && aiGenerated.flashcards.length) flashcards = aiGenerated.flashcards;
+						if (Array.isArray(aiGenerated.quiz) && aiGenerated.quiz.length) quizArr = aiGenerated.quiz;
+						// if AI provided a verbatim reading string, prefer it for the read view
+						if (aiGenerated.reading && typeof aiGenerated.reading === 'string' && aiGenerated.reading.trim()) {
+							// store generated HTML for later insertion
+							window.__addLessonGeneratedHtml = aiGenerated.reading;
+						}
+					}
+				} catch (e) { console.warn('AI generation failed', e); }
 			}
 
 			// store attachments metadata; include image dataUrls so original letter images can be shown in `Read`
@@ -2497,7 +2518,7 @@
 			}
 			// Use the shared `lesson-content` class so formatting and theme match other lessons
 			const readTextHtml = `<div class="lesson-content">${titleHtml}${descHtml}${contentBody}</div>`;
-			const lesson = { id, title, desc: desc || '', public: isPublic, attachments: attachments, content: { read: readTextHtml, summary: summary, chart: chartObj, quiz: quizArr } };
+			const lesson = { id, title, desc: desc || '', public: isPublic, attachments: attachments, generated: aiGenerated || null, content: { read: readTextHtml, summary: summary, chart: chartObj, quiz: quizArr } };
 			// register flashcards in preset map so renderFlashcards picks them up
 			if (flashcards && flashcards.length) presetFlashcards[id] = flashcards;
 

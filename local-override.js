@@ -5,13 +5,13 @@
 
 // Example Firebase web config override (paste your project's values):
 window.__LAGRO_FIREBASE_CONFIG__ = window.__LAGRO_FIREBASE_CONFIG__ || {
-  apiKey: "AIzaSyDADWVlZf4E3DpB-dgf6ThT_nNZQIpQV3Y",
-  authDomain: "reviewer-1b479.firebaseapp.com",
-  projectId: "reviewer-1b479",
-  storageBucket: "reviewer-1b479.firebasestorage.app",
-  messagingSenderId: "858834913707",
-  appId: "1:858834913707:web:a314862b2bdc7afaff2aee",
-  measurementId: "G-K2KWPJV1SQ"
+  apiKey: "AIzaSyDmKoO0Vk3RkC-FKmS9Pw5JUwysDmpNHmU",
+  authDomain: "lagro-reviewer.firebaseapp.com",
+  projectId: "lagro-reviewer",
+  storageBucket: "lagro-reviewer.firebasestorage.app",
+  messagingSenderId: "321632010387",
+  appId: "1:321632010387:web:33c6a004a50e94a1e84d66",
+  measurementId: "G-1XL87EYWBC"
 };
 
 // Helper to get Firebase config (allows runtime override if needed)
