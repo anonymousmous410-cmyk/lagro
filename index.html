@@ -15,8 +15,82 @@
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 
 		<script>
-			tailwind.config = {
-				theme: {
+						,
+					{
+						id: "q4-w4-tectonics",
+						week: "Week 4",
+						title: "Q4 W4: Tectonic Plate Interactions",
+						desc: "Formation of the Philippines, tectonic processes, and resources.",
+						content: {
+							read: `
+					<div class="prose">
+						<h3>Formation of the Philippines</h3>
+						<p>The Philippines is an <b>archipelago</b>—a cluster of islands—sharing a complex geological origin. It is located on the <b>Philippine Mobile Belt</b>, a region of high tectonic activity.</p>
+                        
+						<h3>Key Tectonic Processes</h3>
+						<p>Our islands formed primarily through <b>Subduction</b>. This occurs at a <b>Convergent Boundary</b> where two plates smash together and one dives beneath the other into the mantle. This process melts rock into <b>magma</b>, which rises to form <b>volcanic island arcs</b>.</p>
+                        
+						<h3>The "Sugar Bowl" & Resources</h3>
+						<p>The tectonic activity that creates hazards also provides benefits. Volcanic eruptions deposit minerals like phosphorus and calcium, creating fertile <b>Andosols</b>. The "Sugar Bowl" in Negros Island thrives because of the fertile volcanic plains near Mt. Kanlaon.</p>
+                        
+						<h3>Pacific Ring of Fire</h3>
+						<p>Because we sit along the <b>Pacific Ring of Fire</b>, the Philippines is one of the world's most mineral-rich countries, pushing gold, copper, and nickel toward the surface.</p>
+					</div>
+				`,
+							cards: [
+								{ front: "What is an Archipelago?", back: "A big cluster or neighborhood of islands sharing a common geological origin." },
+								{ front: "What is Subduction?", back: "A process where one tectonic plate moves toward and sinks beneath another plate." },
+								{ front: "What is the 'Sugar Bowl'?", back: "Fertile volcanic plains on Negros Island (near Mt. Kanlaon) famous for sugar industry." },
+								{ front: "Which belt is PH located on?", back: "The Philippine Mobile Belt." },
+								{ front: "Define Convergent Boundary.", back: "A place where two massive pieces of earth smash together." }
+							],
+							quiz: [
+								{ q: "Which process involves one plate sinking beneath another to create magma?", options: ["Erosion", "Subduction", "Divergence", "Weathering"], a: 1 },
+								{ q: "What is the primary reason for the fertile soil in the 'Sugar Bowl' of Negros?", options: ["Heavy rainfall", "Volcanic minerals/Andosols", "River deposits", "Organic fertilizer"], a: 1 },
+								{ q: "The Philippines is part of which high-activity geological region?", options: ["Atlantic Ridge", "Pacific Ring of Fire", "Sahara Belt", "Arctic Circle"], a: 1 }
+							]
+						}
+					},
+					{
+						id: "q4-w5-geography",
+						week: "Week 5",
+						title: "Q4 W5: Landforms, Climate, & Life",
+						desc: "Location, monsoons, unique landforms, and biodiversity of the Philippines.",
+						content: {
+							read: `
+					<div class="prose">
+						<h3>Geographical Location</h3>
+						<p>The Philippines is located near the <b>Equator</b>, which gives us a <b>Tropical Maritime Climate</b>. This climate is warm, humid, and influenced by sea breezes.</p>
+                        
+						<h3>Monsoons in the PH</h3>
+						<ul>
+							<li><b>Amihan (Northeast Monsoon):</b> Brings cool, dry air from Oct/Nov to Feb/March.</li>
+							<li><b>Habagat (Southwest Monsoon):</b> Brings warm, moist air and heavy rains from June to October.</li>
+						</ul>
+                        
+						<h3>Unique Landforms</h3>
+						<p>Our location creates <b>Karst Topography</b>, such as the Chocolate Hills in Bohol and the Underground River in Palawan. These are shaped by the dissolution of soluble rocks like limestone.</p>
+                        
+						<h3>Biodiversity</h3>
+						<p>The warm climate and proximity to the equator support high <b>Biodiversity</b>, including unique species like the Philippine Eagle, Tarsier, and vast coral reefs.</p>
+					</div>
+				`,
+							cards: [
+								{ front: "What is Amihan?", back: "The Northeast Monsoon bringing cool, dry air (Oct-Feb)." },
+								{ front: "What is Habagat?", back: "The Southwest Monsoon bringing warm, moist air and rain (June-Oct)." },
+								{ front: "Example of Karst Topography?", back: "Chocolate Hills (Bohol) or the Underground River (Palawan)." },
+								{ front: "What climate does PH have?", back: "Tropical Maritime Climate (warm and humid)." },
+								{ front: "Why is PH rich in life?", back: "Due to its location near the equator and warm tropical climate." }
+							],
+							quiz: [
+								{ q: "Which monsoon is characterized by cool, dry air from the Northeast?", options: ["Habagat", "Amihan", "Trade Winds", "Easterlies"], a: 1 },
+								{ q: "Which type of topography is responsible for the formation of the Chocolate Hills?", options: ["Glacial", "Volcanic", "Karst", "Desert"], a: 2 },
+								{ q: "What does 'Maritime' climate mean?", options: ["Always cold", "Influenced by the sea", "Extremely dry", "High altitude"], a: 1 }
+							]
+						}
+					}
+						]
+					},
 					extend: {
 						colors: {
 							'lagro-green': '#064e3b',
@@ -54,13 +128,10 @@
 		onAuthStateChanged(auth, (user) => {
 			try { if (window.applyFirebaseUser) window.applyFirebaseUser(user); } catch(e){}
 		});
-
-		// expose sign-in/up/out functions for the non-module script
-		async function firebaseSignIn(email, password) {
-			const cred = await signInWithEmailAndPassword(auth, email, password);
-			return cred.user;
-		}
-
+				flashcards = generateFlashcardsFromText(extractedText);
+			 
+		              
+ 
 		async function firebaseSignUp(email, password) {
 			const cred = await createUserWithEmailAndPassword(auth, email, password);
 			return cred.user;
@@ -112,6 +183,15 @@
 		window.firebaseSignUp = firebaseSignUp;
 		window.firebaseSignOut = firebaseSignOut;
 		window.firebaseSignInWithGoogle = firebaseSignInWithGoogle;
+
+		// helper to get Firebase ID token for server requests
+		window.getFirebaseIdToken = async function() {
+			try {
+				const user = auth.currentUser;
+				if (!user) return null;
+				return await user.getIdToken();
+			} catch (e) { return null; }
+		};
 
 		// Lightweight Firestore helpers for community posts (used by non-module scripts)
 		window.firestore = {
@@ -1175,7 +1255,7 @@
 			document.getElementById('lesson-page-title').innerText = currentSubject.title;
 			const list = document.getElementById('lesson-list'); list.innerHTML = '';
 			ensureSwipeStyles();
-			currentSubject.lessons.forEach(ls => {
+			currentSubject.lessons.forEach((ls, idx) => {
 				const li = document.createElement('li');
 				li.className = 'lesson-item p-6 cursor-pointer transition group relative overflow-hidden';
 				// build thumbnail if image attachment exists
@@ -1188,13 +1268,27 @@
 						}
 					}
 				} catch (e) { thumbHtml = ''; }
+
+				// if no image thumbnail, show initials avatar
+				if (!thumbHtml) {
+					const nameForAvatar = ls.createdBy || ls.author || (ls.content && ls.content.author) || 'U';
+					const parts = (nameForAvatar || 'U').toString().split(' ').filter(Boolean);
+					const initials = parts.length === 1 ? parts[0].slice(0,1) : (parts[0][0] + (parts[1] ? parts[1][0] : ''));
+					thumbHtml = `<div class="lesson-thumb w-12 h-12 mr-4 rounded-full bg-emerald-50 flex items-center justify-center text-lagro-green font-semibold flex-shrink-0">${escapeHtml(initials.toUpperCase())}</div>`;
+				}
+
+				const authorName = ls.createdBy || ls.author || 'Unknown';
+				const weekNum = (ls && ls.week) ? ls.week : (idx + 1);
+				const weekLabel = 'Week ' + weekNum + ' — by ' + authorName;
+
 				li.innerHTML = `
 					<div class="lesson-row flex justify-between items-center w-full transition-transform duration-200" style="transform:translateX(0);">
 						<div class="lesson-main flex items-center">
 							${thumbHtml}
 							<div>
-								<h4 class="text-lg font-bold text-lagro-green group-hover:text-emerald-600 transition">${ls.title}</h4>
-								<p class="text-sm text-slate-500 mt-1">${ls.desc}</p>
+								<h4 class="text-lg font-bold text-lagro-green group-hover:text-emerald-600 transition">${escapeHtml(weekLabel)}</h4>
+								<p class="text-sm text-slate-500 mt-1">${escapeHtml(ls.title || '')}${ls.desc ? (' — ' + escapeHtml(ls.desc)) : ''}</p>
+								<div class="text-xs text-slate-400 mt-2">${ls.createdAt ? (new Date(ls.createdAt).toLocaleString()) : ''}</div>
 							</div>
 							</div>
 						<div class="lesson-actions flex items-center gap-4" style="flex-shrink:0;">
@@ -1337,10 +1431,27 @@
 			if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
 			const idx = currentSubject.lessons.findIndex(l => l.id === lessonId);
 			if (idx === -1) return alert('Lesson not found.');
-			currentSubject.lessons.splice(idx, 1);
-			saveLessonsToStorage();
-			renderLessons();
-			if (currentLesson && currentLesson.id === lessonId) { currentLesson = null; showView('view-lessons'); }
+			// attempt server-side deletion first
+			(async () => {
+				try {
+					const headers = {};
+					try { const tok = (window.getFirebaseIdToken ? await window.getFirebaseIdToken() : null); if (tok) headers['Authorization'] = 'Bearer ' + tok; } catch(e){}
+					const resp = await fetch('/api/subjects/' + encodeURIComponent(currentSubject.id) + '/lessons/' + encodeURIComponent(lessonId), { method: 'DELETE', headers });
+					if (resp.ok) {
+						currentSubject.lessons.splice(idx, 1);
+						saveLessonsToStorage();
+						renderLessons();
+						if (currentLesson && currentLesson.id === lessonId) { currentLesson = null; showView('view-lessons'); }
+						return;
+					}
+					// if server responded non-ok, fall through to client deletion fallback
+				} catch (e) { console.warn('Server delete failed, falling back to local delete', e); }
+				// fallback: local-only deletion
+				currentSubject.lessons.splice(idx, 1);
+				saveLessonsToStorage();
+				renderLessons();
+				if (currentLesson && currentLesson.id === lessonId) { currentLesson = null; showView('view-lessons'); }
+			})();
 		}
 
 		function renderContent() {
@@ -1658,6 +1769,11 @@
 			profile = { uid: user.uid || null, name: display, email: user.email || '' };
 			try { localStorage.setItem('lagro_profile', JSON.stringify(profile)); } catch (e) {}
 			window.profile = profile;
+			// store provider info so UI can adapt (e.g., disable password field when signed in via Google)
+			try {
+				const provider = (user.providerData && user.providerData[0] && user.providerData[0].providerId) || null;
+				if (provider) localStorage.setItem('lagro_auth_provider', provider);
+			} catch (e) {}
 			updateProfileUI();
 		}
 
@@ -2088,19 +2204,6 @@
 		document.addEventListener('click', (e) => { try { closeAllSwipes(); } catch (err) {} const m = document.getElementById('profile-menu'); if (m) m.classList.add('hidden'); const am = document.getElementById('add-menu'); if (am) am.classList.add('hidden'); });
 		// Profile modal handlers removed
 
-		// Apply a Firebase user object to the UI (called from module onAuthStateChanged)
-		function applyFirebaseUser(user) {
-			if (!user) return;
-			profile = { name: user.displayName || (user.email ? user.email.split('@')[0] : 'User'), email: user.email || '' };
-			// store provider info so UI can adapt (e.g., disable password field when signed in via Google)
-			try { localStorage.setItem('lagro_profile', JSON.stringify(profile)); } catch (e) {}
-			try {
-				const provider = (user.providerData && user.providerData[0] && user.providerData[0].providerId) || null;
-				if (provider) localStorage.setItem('lagro_auth_provider', provider);
-			} catch (e) {}
-			updateProfileUI();
-		}
-
 		// saveProfile removed; profile editing is not available in this build
 
 		function logout() {
@@ -2273,7 +2376,7 @@
 		const m = document.getElementById('add-subject-modal'); if (!m) return; m.classList.add('hidden'); m.classList.remove('flex');
 	}
 
-	function submitAddSubject() {
+	async function submitAddSubject() {
 		console.log('submitAddSubject profile', profile, window.profile);
 		if (!profile || (!profile.uid && !profile.email)) { alert('Please sign in with Google to add subjects.'); return; }
 		const t = (document.getElementById('add-subject-title')||{}).value || '';
@@ -2285,19 +2388,23 @@
 		const iconInput = (document.getElementById('add-subject-icon')||{}).value || '';
 		const iconVal = iconInput.trim() ? iconInput.trim() : '📚';
 		const createdBy = (profile && profile.name) ? profile.name : 'Guest';
-		// Try server-side creation first
-		fetch('/api/subjects', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ id, title: t.trim(), icon: iconVal, desc: d.trim(), createdBy })
-		}).then(async (r) => {
-			if (!r.ok) {
+		// Try server-side creation first (include ID token if available)
+		try {
+			const headers = { 'Content-Type': 'application/json' };
+			try { const tok = (window.getFirebaseIdToken ? await window.getFirebaseIdToken() : null); if (tok) headers['Authorization'] = 'Bearer ' + tok; } catch(e) { console.warn('getFirebaseIdToken failed', e); }
+			const resp = await fetch('/api/subjects', { method: 'POST', headers, body: JSON.stringify({ id, title: t.trim(), icon: iconVal, desc: d.trim(), createdBy }) });
+			console.log('POST /api/subjects status', resp.status);
+			const txt = await resp.text().catch(()=>null);
+			console.log('POST /api/subjects body', txt);
+			if (!resp.ok) {
 				// fallback to client-side only
 				subjects[id] = { id: id, title: t.trim(), icon: iconVal, color: 'bg-emerald-50 text-lagro-green border-emerald-200', desc: d.trim(), lessons: [] };
 				try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
 				renderSubjects(); selectSubject(id); closeAddSubjectModal();
 				return;
 			}
-			const j = await r.json();
+			let j = null;
+			try { j = JSON.parse(txt); } catch (e) { j = null; }
 			if (j && j.subject) {
 				subjects[j.subject.id] = j.subject;
 				try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
@@ -2308,12 +2415,13 @@
 				try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
 				renderSubjects(); selectSubject(id); closeAddSubjectModal();
 			}
-		}).catch((err)=>{
-			// server not available — fallback to client-only
+		} catch (err) {
+			console.error('submitAddSubject fetch failed', err);
+			// fallback to client-side only
 			subjects[id] = { id: id, title: t.trim(), icon: iconVal, color: 'bg-emerald-50 text-lagro-green border-emerald-200', desc: d.trim(), lessons: [] };
 			try { localStorage.setItem('lagro_subjects_v1', JSON.stringify(subjects)); } catch(e){}
 			renderSubjects(); selectSubject(id); closeAddSubjectModal();
-		});
+		}
 	}
 
 		function closeAddLessonModal() {
@@ -2385,6 +2493,68 @@
 				const parts = s.split(/(?<=[\.\?!])\s+/).filter(Boolean);
 				return parts.slice(0, sentences).join(' ');
 			} catch (e) { return text.slice(0, Math.min(300, text.length)); }
+		}
+
+		// Produce structured keypoints HTML from extracted text (uses AI if apiKey provided)
+		async function aiGenerateKeypoints(text, apiKey) {
+			if (!text || !text.trim() || !apiKey) return null;
+			const prompt = `You are an expert educator. Given the following lesson text, extract concise, structured keypoints. Return only a JSON array named "sections" where each section has {"heading": string, "bullets": [string,...]}. Limit to 6 sections and up to 5 bullets each. Text:\n\n` + text.slice(0, 20000);
+			const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
+			try {
+				const url = `https://generativelanguage.googleapis.com/v2/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+				const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+				const j = await resp.json();
+				const txt = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
+				if (!txt) return null;
+				let parsed = null;
+				try { parsed = JSON.parse(txt); } catch(e) {
+					const match = txt.match(/\{[\s\S]*\}/m);
+					if (match) {
+						try { parsed = JSON.parse(match[0]); } catch(e2) { parsed = null; }
+					}
+				}
+				if (!parsed) return null;
+				const sections = Array.isArray(parsed.sections) ? parsed.sections : (Array.isArray(parsed) ? parsed : []);
+				let out = '';
+				sections.slice(0,6).forEach(sec=>{
+					if (!sec) return;
+					if (sec.heading) out += `<h4 class="text-md font-semibold text-lagro-green mt-3 mb-2">${escapeHtml(String(sec.heading))}</h4>`;
+					const bullets = Array.isArray(sec.bullets) ? sec.bullets.slice(0,5) : [];
+					if (bullets.length) {
+						out += '<ul class="list-disc pl-5 text-sm text-slate-300 mb-2">';
+						bullets.forEach(b => out += `<li>${escapeHtml(b)}</li>`);
+						out += '</ul>';
+					}
+				});
+				return out || null;
+			} catch (e) { console.warn('aiGenerateKeypoints error', e); return null; }
+		}
+
+		function generateKeypointsFromText(text) {
+			if (!text || !text.trim()) return '<div class="text-sm text-slate-500">No keypoints generated.</div>';
+			const raw = text.replace(/\r/g,'').trim();
+			const sections = raw.split(/\n\s*\n/).filter(s => s.trim());
+			let out = '';
+			sections.forEach((sec) => {
+				const lines = sec.replace(/\n/g,' ').split(/(?<=[\.\!\?])\s+/).map(s=>s.trim()).filter(Boolean);
+				let heading = null;
+				if (lines.length && lines[0].length < 80 && /[:\-]$/.test(lines[0]) ) {
+					heading = lines.shift().replace(/[:\-]+$/,'').trim();
+				} else if (lines.length && lines[0].split(' ').length <= 6 && /^[A-Z]/.test(lines[0])) {
+					heading = lines.shift();
+				}
+				const sentences = sec.replace(/\n/g,' ').split(/(?<=[\.\!\?])\s+/).map(s=>s.trim()).filter(Boolean);
+				const bullets = sentences.slice(0,3);
+				if (heading) out += `<h4 class="text-md font-semibold text-lagro-green mt-3 mb-2">${escapeHtml(heading)}</h4>`;
+				if (bullets.length) {
+					out += '<ul class="list-disc pl-5 text-sm text-slate-300 mb-2">';
+					bullets.forEach(b => out += `<li>${escapeHtml(b)}</li>`);
+					out += '</ul>';
+				} else {
+					out += `<p class="text-sm text-slate-300 mb-2">${escapeHtml(sec.slice(0,240))}${sec.length>240? '…':''}</p>`;
+				}
+			});
+			return out;
 		}
 
 		async function generatePreview() {
@@ -2482,90 +2652,42 @@
 			if (extractedText && extractedText.trim().length > 30) {
 				chartObj = generateChartFromText(extractedText);
 				quizArr = generateQuizFromText(extractedText, 6);
-				flashcards = generateFlashcardsFromText(extractedText, 20);
-			}
-
-			// Attempt AI generation if available (may replace or augment generated assets)
-			if (extractedText && extractedText.trim().length > 30 && window.generateLessonWithAI) {
-				try {
-					aiGenerated = await window.generateLessonWithAI(extractedText);
-					if (aiGenerated) {
-						if (Array.isArray(aiGenerated.flashcards) && aiGenerated.flashcards.length) flashcards = aiGenerated.flashcards;
-						if (Array.isArray(aiGenerated.quiz) && aiGenerated.quiz.length) quizArr = aiGenerated.quiz;
-						// if AI provided a verbatim reading string, prefer it for the read view
-						if (aiGenerated.reading && typeof aiGenerated.reading === 'string' && aiGenerated.reading.trim()) {
-							// store generated HTML for later insertion
-							window.__addLessonGeneratedHtml = aiGenerated.reading;
-						}
+				function generateFlashcardsFromText(text, maxCards = 15) {
+					const sentences = (text.replace(/\s+/g,' ').split(/(?<=[\.\!?])\s+/) || []).filter(s => s.length > 30);
+					const out = [];
+					for (let i = 0; i < Math.min(maxCards, sentences.length); i++) {
+						const s = sentences[i].trim();
+						const front = s.length > 80 ? s.slice(0, 80).trim() + '…' : s;
+						out.push({ front, back: s });
 					}
-				} catch (e) { console.warn('AI generation failed', e); }
-			}
+						return out;
+					}
+					flashcards = generateFlashcardsFromText(extractedText);
+				}
 
-			// store attachments metadata; include image dataUrls so original letter images can be shown in `Read`
-			const attachments = __addLessonFiles.map(f => ({ name: f.name, type: f.type, dataUrl: f.dataUrl || null }));
-			// Build a readable block for the Read view using same classes as other lessons
-			const titleHtml = `<h3 class="text-2xl font-serif font-bold text-lagro-green mb-2">${escapeHtml(title)}</h3>`;
-			const descHtml = desc ? `<p class="text-slate-500 mb-4">${escapeHtml(desc)}</p>` : '';
-			let contentBody = '';
-			// Prefer the generated structured HTML from preview if available
-			if (window.__addLessonGeneratedHtml && window.__addLessonGeneratedHtml.trim()) {
-				contentBody = window.__addLessonGeneratedHtml;
-			} else if (extractedText && extractedText.trim().length > 0) {
-				// split into paragraphs by blank lines and preserve single-line breaks within paragraphs
-				const safe = escapeHtml(extractedText).replace(/\r/g,'');
-				const parts = safe.split(/\n\s*\n/).map(p => p.replace(/\n/g,' '));
-				contentBody = parts.map(p => `<p class="mb-4">${p}</p>`).join('');
-			}
-			// Use the shared `lesson-content` class so formatting and theme match other lessons
-			const readTextHtml = `<div class="lesson-content">${titleHtml}${descHtml}${contentBody}</div>`;
-			const lesson = { id, title, desc: desc || '', public: isPublic, attachments: attachments, generated: aiGenerated || null, content: { read: readTextHtml, summary: summary, chart: chartObj, quiz: quizArr } };
-			// register flashcards in preset map so renderFlashcards picks them up
-			if (flashcards && flashcards.length) presetFlashcards[id] = flashcards;
-
-			if (!subjects[subj]) subjects[subj] = { id: subj, title: subj, lessons: [] };
-			subjects[subj].lessons.push(lesson);
-
-			// navigate to the subject's lesson list so the user sees the newly created lesson
-			currentSubject = subjects[subj];
-			renderLessons();
-			showView('view-lessons');
-			updateBreadcrumbs();
-			// If user marked as public and cloud is available, upload to Firestore (and optionally generate enhanced AI lesson server-side)
-			if (isPublic && window.uploadLessonToCloud) {
+			// try to fetch server-persisted subjects/lessons and merge
+			(async () => {
 				try {
-					document.getElementById('add-lesson-preview-meta').innerText = 'Sharing to community...';
-					window.uploadLessonToCloud(Object.assign({}, lesson, { extractedText }), subj).then(() => {
-						document.getElementById('add-lesson-preview-meta').innerText = 'Shared to community.';
-					}).catch(e=>{ console.warn('Cloud upload failed', e); document.getElementById('add-lesson-preview-meta').innerText = 'Share failed.'; });
-				} catch (e) { console.warn(e); }
-			}
-			// persist user-created lessons
-			saveUserLessons();
-			// refresh UI
-			if (currentSubject && currentSubject.id === subj) renderLessons();
-			alert('Lesson created with generated visuals, quiz and flashcards. You can view it in the selected subject.');
-			closeAddLessonModal();
-		}
-
-		function saveUserLessons() {
-			try {
-				const out = {};
-				Object.keys(subjects).forEach(k => { out[k] = (subjects[k].lessons || []).filter(l => String(l.id).startsWith('u')); });
-				localStorage.setItem('lagro_user_lessons_v1', JSON.stringify(out));
-			} catch (e) { console.warn('Save failed', e); }
-		}
-
-		function loadUserLessons() {
-			try {
-				const raw = localStorage.getItem('lagro_user_lessons_v1');
-				if (!raw) return;
-				const parsed = JSON.parse(raw || '{}');
-				Object.keys(parsed).forEach(sid => {
-					if (!subjects[sid]) subjects[sid] = { id: sid, title: sid, lessons: [] };
-					// append user-created lessons after existing lessons so new posts appear at the bottom
-					subjects[sid].lessons = (subjects[sid].lessons || []).concat(parsed[sid] || []);
-				});
-			} catch (e) { console.warn('Load user lessons failed', e); }
+					const resp = await fetch('/api/subjects');
+					if (!resp.ok) return;
+					const j = await resp.json().catch(()=>null);
+					if (!j || !j.subjects) return;
+					Object.keys(j.subjects).forEach(sid => {
+						const srv = j.subjects[sid];
+						if (!srv) return;
+						if (!subjects[sid]) {
+							subjects[sid] = srv;
+						} else {
+							// merge lessons, avoiding duplicate ids
+							subjects[sid].lessons = subjects[sid].lessons || [];
+							const existing = new Set(subjects[sid].lessons.map(l => l.id));
+							(srv.lessons || []).forEach(l => { if (!existing.has(l.id)) subjects[sid].lessons.push(l); });
+						}
+					});
+					// re-render subjects if necessary
+					try { renderSubjects(); } catch(e){}
+				} catch(e) { console.warn('Fetching server subjects failed', e); }
+			})();
 		}
 
 		// --- content generation helpers ---
@@ -2604,83 +2726,12 @@
 		}
 
 		function generateFlashcardsFromText(text, maxCards = 15) {
-			const sentences = (text.replace(/\s+/g,' ').split(/(?<=[\.\?!])\s+/) || []).filter(s => s.length > 30);
+			const sentences = (text.replace(/\s+/g,' ').split(/(?<=[\.\!?])\s+/) || []).filter(s => s.length > 30);
 			const out = [];
-			for (let i=0;i<Math.min(maxCards, sentences.length);i++) {
+			for (let i = 0; i < Math.min(maxCards, sentences.length); i++) {
 				const s = sentences[i].trim();
-				const front = s.length > 80 ? s.slice(0,80).trim() + '…' : s;
+				const front = s.length > 80 ? s.slice(0, 80).trim() + '…' : s;
 				out.push({ front, back: s });
-			}
-
-			// Generate structured keypoints HTML from extracted text
-			function generateKeypointsFromText(text) {
-				if (!text || !text.trim()) return '<div class="text-sm text-slate-500">No keypoints generated.</div>';
-				// Normalize line breaks
-				const raw = text.replace(/\r/g,'').trim();
-				// Split into sections by two or more newlines
-				const sections = raw.split(/\n\s*\n/).filter(s => s.trim());
-				let out = '';
-				sections.forEach((sec, i) => {
-					const lines = sec.replace(/\n/g,' ').split(/(?<=[\.\?!])\s+/).map(s=>s.trim()).filter(Boolean);
-					// Heuristic: first short line can be a heading
-					let heading = null;
-					if (lines.length && lines[0].length < 80 && /[:\-]$/.test(lines[0]) ) {
-						heading = lines.shift().replace(/[:\-]+$/,'').trim();
-					} else if (lines.length && lines[0].split(' ').length <= 6 && /^[A-Z]/.test(lines[0])) {
-						heading = lines.shift();
-					}
-
-					// Use Google Generative API to produce structured keypoints (returns HTML string)
-					async function aiGenerateKeypoints(text, apiKey) {
-						if (!text || !text.trim() || !apiKey) return null;
-						// Build instruction to return JSON with sections and bullets
-						const prompt = `You are an expert educator. Given the following lesson text, extract concise, structured keypoints. Return only a JSON array named "sections" where each section has {"heading": string, "bullets": [string,...]}. Limit to 6 sections and up to 5 bullets each. Text:\n\n` + text.slice(0, 20000);
-						const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } };
-						try {
-							const url = `https://generativelanguage.googleapis.com/v2/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-							const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-							const j = await resp.json();
-							const txt = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
-							if (!txt) return null;
-							let parsed = null;
-							try { parsed = JSON.parse(txt); } catch(e) {
-								// try to salvage JSON inside text
-								const match = txt.match(/\{[\s\S]*\}/m);
-								if (match) {
-									try { parsed = JSON.parse(match[0]); } catch(e2) { parsed = null; }
-								}
-							}
-							if (!parsed) return null;
-							// Expect parsed to be { sections: [ {heading, bullets: []}, ... ] } or an array
-							const sections = Array.isArray(parsed.sections) ? parsed.sections : (Array.isArray(parsed) ? parsed : []);
-							let out = '';
-							sections.slice(0,6).forEach(sec=>{
-								if (!sec) return;
-								if (sec.heading) out += `<h4 class="text-md font-semibold text-lagro-green mt-3 mb-2">${escapeHtml(String(sec.heading))}</h4>`;
-								const bullets = Array.isArray(sec.bullets) ? sec.bullets.slice(0,5) : [];
-								if (bullets.length) {
-									out += '<ul class="list-disc pl-5 text-sm text-slate-300 mb-2">';
-									bullets.forEach(b => out += `<li>${escapeHtml(b)}</li>`);
-									out += '</ul>';
-								}
-							});
-							return out || null;
-						} catch (e) { console.warn('aiGenerateKeypoints error', e); return null; }
-					}
-					// build bullets by taking first 3 sentences from the section (split by sentence end)
-					const sentences = sec.replace(/\n/g,' ').split(/(?<=[\.\?!])\s+/).map(s=>s.trim()).filter(Boolean);
-					const bullets = sentences.slice(0,3);
-					if (heading) out += `<h4 class="text-md font-semibold text-lagro-green mt-3 mb-2">${escapeHtml(heading)}</h4>`;
-					if (bullets.length) {
-						out += '<ul class="list-disc pl-5 text-sm text-slate-300 mb-2">';
-						bullets.forEach(b => out += `<li>${escapeHtml(b)}</li>`);
-						out += '</ul>';
-					} else {
-						// fallback: render first 120 chars
-						out += `<p class="text-sm text-slate-300 mb-2">${escapeHtml(sec.slice(0,240))}${sec.length>240? '…':''}</p>`;
-					}
-				});
-				return out;
 			}
 			return out;
 		}
