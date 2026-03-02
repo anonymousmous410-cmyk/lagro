@@ -31,6 +31,29 @@ app.use(express.json({ limit: '20mb' }));
 // Note: install the SDK package (e.g. npm install @google/generative-ai) before using.
 let GoogleGenAI;
 let aiClient;
+// Optional Firebase Admin for verifying ID tokens
+let firebaseAdmin = null;
+let firebaseAdminReady = false;
+try {
+  const admin = require('firebase-admin');
+  firebaseAdmin = admin;
+  try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+      admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)) });
+      firebaseAdminReady = true;
+    } else {
+      // Try application default credentials (GOOGLE_APPLICATION_CREDENTIALS)
+      admin.initializeApp();
+      firebaseAdminReady = true;
+    }
+  } catch (e) {
+    console.warn('firebase-admin init skipped (no service creds):', e && e.message ? e.message : e);
+    firebaseAdminReady = false;
+  }
+} catch (e) {
+  // firebase-admin not installed
+  firebaseAdmin = null;
+}
 try {
   const genai = require('@google/generative-ai');
   // support multiple export shapes (GoogleGenAI, TextServiceClient, or default)
@@ -187,6 +210,103 @@ app.post('/api/subjects', (req, res) => {
   const ok = writeSubjects(subjects);
   if (!ok) return res.status(500).json({ error: 'Failed to save subject' });
   return res.json({ subject: subjects[id] });
+});
+
+// API: list all subjects (server-side persisted)
+app.get('/api/subjects', (req, res) => {
+  try {
+    const subjects = readSubjects();
+    return res.json({ subjects });
+  } catch (e) {
+    console.error('Error reading subjects', e);
+    return res.status(500).json({ error: 'Failed to read subjects' });
+  }
+});
+
+// API: add a lesson to a subject. Body: { lesson: { id,title,desc,content,attachments... }, createdBy, authorId }
+// Auth middleware: verifies Firebase ID token when REQUIRE_AUTH=true
+async function verifyAuthToken(req, res, next) {
+  const enforce = String(process.env.REQUIRE_AUTH || '').toLowerCase() === 'true';
+  if (!enforce) return next();
+  if (!firebaseAdmin || !firebaseAdminReady) return res.status(500).json({ error: 'Server auth not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS and install firebase-admin.' });
+  const authHeader = (req.headers.authorization || req.headers.Authorization || '').toString();
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  const idToken = m ? m[1] : (req.body && req.body.idToken) || null;
+  if (!idToken) return res.status(401).json({ error: 'Missing ID token. Provide Authorization: Bearer <token> header.' });
+  try {
+    const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
+    req.user = decoded;
+    return next();
+  } catch (e) {
+    console.warn('verifyIdToken failed', e && e.message ? e.message : e);
+    return res.status(401).json({ error: 'Invalid ID token' });
+  }
+}
+
+app.post('/api/subjects/:id/lessons', verifyAuthToken, async (req, res) => {
+  const sid = req.params.id;
+  const body = req.body || {};
+  const incoming = body.lesson || body;
+  if (!incoming || !incoming.title) return res.status(400).json({ error: 'Missing lesson or lesson.title' });
+  try {
+    const subjects = readSubjects();
+    if (!subjects || !subjects[sid]) return res.status(404).json({ error: 'Subject not found' });
+    const lesson = Object.assign({}, incoming);
+    lesson.id = lesson.id || ('ls_' + Date.now());
+    lesson.createdAt = new Date().toISOString();
+    // assign stable week number if not provided: use max existing week + 1
+    try {
+      const existing = subjects[sid].lessons || [];
+      const maxWeek = existing.reduce((m, it) => {
+        const w = Number(it && it.week) || 0; return Math.max(m, isNaN(w) ? 0 : w);
+      }, 0);
+      lesson.week = (typeof incoming.week !== 'undefined' && incoming.week !== null) ? Number(incoming.week) : (maxWeek + 1 || (existing.length + 1));
+    } catch (e) {
+      lesson.week = (typeof incoming.week !== 'undefined' && incoming.week !== null) ? Number(incoming.week) : 1;
+    }
+    // prefer authenticated user info when available
+    if (req.user && req.user.uid) {
+      lesson.authorId = req.user.uid;
+      lesson.createdBy = req.user.name || req.user.email || req.user.uid;
+    } else {
+      if (body.createdBy) lesson.createdBy = body.createdBy;
+      if (body.authorId) lesson.authorId = body.authorId;
+    }
+    // ensure lessons array
+    subjects[sid].lessons = subjects[sid].lessons || [];
+    subjects[sid].lessons.push(lesson);
+    const ok = writeSubjects(subjects);
+    if (!ok) return res.status(500).json({ error: 'Failed to persist lesson' });
+    return res.json({ lesson, subject: subjects[sid] });
+  } catch (e) {
+    console.error('Failed to add lesson', e);
+    return res.status(500).json({ error: 'Failed to add lesson', detail: e && e.message ? e.message : String(e) });
+  }
+});
+
+// API: delete a lesson by id from a subject
+app.delete('/api/subjects/:id/lessons/:lessonId', verifyAuthToken, (req, res) => {
+  const sid = req.params.id;
+  const lid = req.params.lessonId;
+  try {
+    const subjects = readSubjects();
+    if (!subjects || !subjects[sid]) return res.status(404).json({ error: 'Subject not found' });
+    const lessons = subjects[sid].lessons || [];
+    const idx = lessons.findIndex(l => String(l.id) === String(lid));
+    if (idx === -1) return res.status(404).json({ error: 'Lesson not found' });
+    // optional: only allow deletion by the lesson author when authenticated
+    if (req.user && lessons[idx] && lessons[idx].authorId && String(req.user.uid) !== String(lessons[idx].authorId)) {
+      return res.status(403).json({ error: 'Forbidden: only the lesson author may delete this lesson' });
+    }
+    lessons.splice(idx, 1);
+    subjects[sid].lessons = lessons;
+    const ok = writeSubjects(subjects);
+    if (!ok) return res.status(500).json({ error: 'Failed to persist deletion' });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('Failed to delete lesson', e);
+    return res.status(500).json({ error: 'Failed to delete lesson', detail: e && e.message ? e.message : String(e) });
+  }
 });
 
 // Serve static files from the project root (index.html, assets, css, js)

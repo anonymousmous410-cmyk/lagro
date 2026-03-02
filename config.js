@@ -21,7 +21,7 @@ window.getLagroConfig = function() {
     const override = window.__LAGRO_CONFIG_OVERRIDE__ || {};
     return Object.assign({}, window.LAGRO_CONFIG || {}, override || {});
   } catch (e) { return window.LAGRO_CONFIG || {}; }
-};s
+};
 
 // For production, inject keys via environment or server-side config.
 
@@ -42,4 +42,17 @@ window.getLagroFirebaseConfig = function() {
   try { return Object.assign({}, window.__LAGRO_FIREBASE_CONFIG__ || {}, window.__LAGRO_FIREBASE_CONFIG_OVERRIDE__ || {}); }
   catch (e) { return window.__LAGRO_FIREBASE_CONFIG__ || {}; }
 };
+
+// Optional: expose OAuth client id used for Google sign-in (helpful for debugging or custom flows)
+window.__LAGRO_OAUTH_CLIENT_ID__ = window.__LAGRO_OAUTH_CLIENT_ID__ || '321632010387-geiqqubf70p2apdip5ga098nphia9aar.apps.googleusercontent.com';
+
+// Helper to get Firebase ID token
+window.getFirebaseIdToken = async function() {
+  try {
+    const token = await window.firebase.auth().getAccessToken();
+    return token;
+  } catch (e) { return null; }
+};
+
+window.profile = localStorage.getItem('lagro_profile');
 

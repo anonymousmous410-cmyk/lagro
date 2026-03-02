@@ -162,7 +162,7 @@ function renderLessons() {
 	const titleEl = document.getElementById('lesson-page-title'); if (titleEl) titleEl.innerText = currentSubject.title;
 	const list = document.getElementById('lesson-list'); if (!list) return; list.innerHTML = '';
 	ensureSwipeStyles();
-	currentSubject.lessons.forEach(ls => {
+	currentSubject.lessons.forEach((ls, idx) => {
 		const li = document.createElement('li');
 			li.className = 'lesson-item p-6 cursor-pointer transition group relative overflow-hidden';
 			// handle clicks with awareness of swipe state and actions
@@ -172,11 +172,31 @@ function renderLessons() {
 				try { closeAllSwipes(); } catch (err) {}
 				selectLesson(ls.id);
 			});
+		// build avatar / thumbnail
+		let thumbHtml = '';
+		try {
+			if (ls.attachments && ls.attachments.length) {
+				const img = ls.attachments.find(a=> (a.type||'').startsWith('image/')) || ls.attachments[0];
+				if (img && img.dataUrl) thumbHtml = `<div class="lesson-thumb w-24 h-24 mr-4 rounded overflow-hidden flex-shrink-0"><img src="${img.dataUrl}" class="w-full h-full object-cover"/></div>`;
+			}
+		} catch(e) { thumbHtml = ''; }
+		if (!thumbHtml) {
+			const nameForAvatar = ls.createdBy || ls.author || 'U';
+			const parts = (nameForAvatar||'U').toString().split(' ').filter(Boolean);
+			const initials = parts.length===1 ? parts[0].slice(0,1) : (parts[0][0] + (parts[1]?parts[1][0]:''));
+			thumbHtml = `<div class="lesson-thumb w-12 h-12 mr-4 rounded-full bg-emerald-50 flex items-center justify-center text-lagro-green font-semibold flex-shrink-0">${initials.toUpperCase()}</div>`;
+		}
+		const authorName = ls.createdBy || ls.author || 'Unknown';
+		const weekNum = (ls && ls.week) ? ls.week : (idx + 1);
+		const weekLabel = 'Week ' + weekNum + ' — by ' + authorName;
 		li.innerHTML = `
 			<div class="lesson-row flex justify-between items-center w-full transition-transform duration-200" style="transform:translateX(0);">
-				<div class="lesson-main">
-					<h4 class="text-lg font-bold text-lagro-green group-hover:text-emerald-600 transition">${ls.title}</h4>
-					<p class="text-sm text-slate-500 mt-1">${ls.desc}</p>
+				<div class="lesson-main flex items-center">
+					${thumbHtml}
+					<div>
+						<h4 class="text-lg font-bold text-lagro-green group-hover:text-emerald-600 transition">${weekLabel}</h4>
+						<p class="text-sm text-slate-500 mt-1">${ls.title || ''}</p>
+					</div>
 				</div>
 				<div class="lesson-actions flex items-center gap-4" style="flex-shrink:0;">
 					<button class="delete-lesson-btn ml-2 px-3 py-1 text-sm bg-red-50 text-red-600 rounded-md border border-red-100 hover:bg-red-100" data-lesson-id="${ls.id}" title="Delete lesson">Delete</button>
@@ -443,25 +463,66 @@ async function createLessonFromUpload() {
 			console.warn('AI summarization failed', err);
 		}
 
-		// Attach file data and persist lesson
+				// Attach file data and persist lesson
 		const reader = new FileReader();
 		reader.onload = () => {
-			lesson.content.upload = { name: file.name, type: file.type, dataUrl: reader.result };
-			currentSubject.lessons.push(lesson);
-			saveLessonsToStorage();
-			renderLessons();
-			closeAddLessonModal();
-			alert('Lesson created from upload.');
+						lesson.content.upload = { name: file.name, type: file.type, dataUrl: reader.result };
+						// Try to persist to server if available
+						(async () => {
+								try {
+								const payload = { lesson: lesson, createdBy: (window.profile && window.profile.name) ? window.profile.name : undefined, authorId: (window.profile && window.profile.uid) ? window.profile.uid : undefined };
+								const headers = { 'Content-Type': 'application/json' };
+								try {
+									const idTok = (window.getFirebaseIdToken ? await window.getFirebaseIdToken() : null);
+									if (idTok) headers['Authorization'] = 'Bearer ' + idTok;
+								} catch (e) { /* ignore token errors */ }
+								const resp = await fetch('/api/subjects/' + encodeURIComponent(currentSubject.id) + '/lessons', { method: 'POST', headers, body: JSON.stringify(payload) });
+								if (resp.ok) {
+									const j = await resp.json().catch(()=>null);
+									if (j && j.lesson) {
+										// replace or append lesson returned by server
+										currentSubject.lessons.push(j.lesson);
+									} else {
+										currentSubject.lessons.push(lesson);
+									}
+								} else {
+									// fallback to local-only
+									currentSubject.lessons.push(lesson);
+								}
+							} catch (e) {
+								console.warn('Persisting lesson to server failed', e);
+								currentSubject.lessons.push(lesson);
+							}
+							saveLessonsToStorage();
+							renderLessons();
+							closeAddLessonModal();
+							alert('Lesson created from upload.');
+						})();
 		};
 		reader.readAsDataURL(file);
-	} else {
-		currentSubject.lessons.push(lesson);
-		saveLessonsToStorage();
-		renderLessons();
-		closeAddLessonModal();
-		try { createCommunityPostForLesson(title, currentSubject.title); } catch(e) { console.warn('createCommunityPostForLesson failed', e); }
-		alert('Lesson created.');
-	}
+		} else {
+				// no file: try server persist first
+				(async () => {
+					try {
+						const payload = { lesson: lesson, createdBy: (window.profile && window.profile.name) ? window.profile.name : undefined, authorId: (window.profile && window.profile.uid) ? window.profile.uid : undefined };
+						const resp = await fetch('/api/subjects/' + encodeURIComponent(currentSubject.id) + '/lessons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+						if (resp.ok) {
+							const j = await resp.json().catch(()=>null);
+							if (j && j.lesson) currentSubject.lessons.push(j.lesson); else currentSubject.lessons.push(lesson);
+						} else {
+							currentSubject.lessons.push(lesson);
+						}
+					} catch (e) {
+						console.warn('Persisting lesson to server failed', e);
+						currentSubject.lessons.push(lesson);
+					}
+					saveLessonsToStorage();
+					renderLessons();
+					closeAddLessonModal();
+					try { createCommunityPostForLesson(title, currentSubject.title); } catch(e) { console.warn('createCommunityPostForLesson failed', e); }
+					alert('Lesson created.');
+				})();
+		}
 }
 
 // Helper: send file to server endpoint /api/summarize-file which returns { summary }
