@@ -15,14 +15,16 @@
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 
 		<script>
-						,
-					{
-						id: "q4-w4-tectonics",
-						week: "Week 4",
-						title: "Q4 W4: Tectonic Plate Interactions",
-						desc: "Formation of the Philippines, tectonic processes, and resources.",
-						content: {
-							read: `
+		// Page lesson data and light Tailwind overrides exposed for other scripts
+		window.__LAGRO_DATA__ = {
+			lessons: [
+				{
+					id: "q4-w4-tectonics",
+					week: "Week 4",
+					title: "Q4 W4: Tectonic Plate Interactions",
+					desc: "Formation of the Philippines, tectonic processes, and resources.",
+					content: {
+						read: `
 					<div class="prose">
 						<h3>Formation of the Philippines</h3>
 						<p>The Philippines is an <b>archipelago</b>—a cluster of islands—sharing a complex geological origin. It is located on the <b>Philippine Mobile Belt</b>, a region of high tectonic activity.</p>
@@ -36,28 +38,28 @@
 						<h3>Pacific Ring of Fire</h3>
 						<p>Because we sit along the <b>Pacific Ring of Fire</b>, the Philippines is one of the world's most mineral-rich countries, pushing gold, copper, and nickel toward the surface.</p>
 					</div>
-				`,
-							cards: [
-								{ front: "What is an Archipelago?", back: "A big cluster or neighborhood of islands sharing a common geological origin." },
-								{ front: "What is Subduction?", back: "A process where one tectonic plate moves toward and sinks beneath another plate." },
-								{ front: "What is the 'Sugar Bowl'?", back: "Fertile volcanic plains on Negros Island (near Mt. Kanlaon) famous for sugar industry." },
-								{ front: "Which belt is PH located on?", back: "The Philippine Mobile Belt." },
-								{ front: "Define Convergent Boundary.", back: "A place where two massive pieces of earth smash together." }
-							],
-							quiz: [
-								{ q: "Which process involves one plate sinking beneath another to create magma?", options: ["Erosion", "Subduction", "Divergence", "Weathering"], a: 1 },
-								{ q: "What is the primary reason for the fertile soil in the 'Sugar Bowl' of Negros?", options: ["Heavy rainfall", "Volcanic minerals/Andosols", "River deposits", "Organic fertilizer"], a: 1 },
-								{ q: "The Philippines is part of which high-activity geological region?", options: ["Atlantic Ridge", "Pacific Ring of Fire", "Sahara Belt", "Arctic Circle"], a: 1 }
-							]
-						}
-					},
-					{
-						id: "q4-w5-geography",
-						week: "Week 5",
-						title: "Q4 W5: Landforms, Climate, & Life",
-						desc: "Location, monsoons, unique landforms, and biodiversity of the Philippines.",
-						content: {
-							read: `
+					`,
+						cards: [
+							{ front: "What is an Archipelago?", back: "A big cluster or neighborhood of islands sharing a common geological origin." },
+							{ front: "What is Subduction?", back: "A process where one tectonic plate moves toward and sinks beneath another plate." },
+							{ front: "What is the 'Sugar Bowl'?", back: "Fertile volcanic plains on Negros Island (near Mt. Kanlaon) famous for sugar industry." },
+							{ front: "Which belt is PH located on?", back: "The Philippine Mobile Belt." },
+							{ front: "Define Convergent Boundary.", back: "A place where two massive pieces of earth smash together." }
+						],
+						quiz: [
+							{ q: "Which process involves one plate sinking beneath another to create magma?", options: ["Erosion", "Subduction", "Divergence", "Weathering"], a: 1 },
+							{ q: "What is the primary reason for the fertile soil in the 'Sugar Bowl' of Negros?", options: ["Heavy rainfall", "Volcanic minerals/Andosols", "River deposits", "Organic fertilizer"], a: 1 },
+							{ q: "The Philippines is part of which high-activity geological region?", options: ["Atlantic Ridge", "Pacific Ring of Fire", "Sahara Belt", "Arctic Circle"], a: 1 }
+						]
+					}
+				},
+				{
+					id: "q4-w5-geography",
+					week: "Week 5",
+					title: "Q4 W5: Landforms, Climate, & Life",
+					desc: "Location, monsoons, unique landforms, and biodiversity of the Philippines.",
+					content: {
+						read: `
 					<div class="prose">
 						<h3>Geographical Location</h3>
 						<p>The Philippines is located near the <b>Equator</b>, which gives us a <b>Tropical Maritime Climate</b>. This climate is warm, humid, and influenced by sea breezes.</p>
@@ -74,39 +76,38 @@
 						<h3>Biodiversity</h3>
 						<p>The warm climate and proximity to the equator support high <b>Biodiversity</b>, including unique species like the Philippine Eagle, Tarsier, and vast coral reefs.</p>
 					</div>
-				`,
-							cards: [
-								{ front: "What is Amihan?", back: "The Northeast Monsoon bringing cool, dry air (Oct-Feb)." },
-								{ front: "What is Habagat?", back: "The Southwest Monsoon bringing warm, moist air and rain (June-Oct)." },
-								{ front: "Example of Karst Topography?", back: "Chocolate Hills (Bohol) or the Underground River (Palawan)." },
-								{ front: "What climate does PH have?", back: "Tropical Maritime Climate (warm and humid)." },
-								{ front: "Why is PH rich in life?", back: "Due to its location near the equator and warm tropical climate." }
-							],
-							quiz: [
-								{ q: "Which monsoon is characterized by cool, dry air from the Northeast?", options: ["Habagat", "Amihan", "Trade Winds", "Easterlies"], a: 1 },
-								{ q: "Which type of topography is responsible for the formation of the Chocolate Hills?", options: ["Glacial", "Volcanic", "Karst", "Desert"], a: 2 },
-								{ q: "What does 'Maritime' climate mean?", options: ["Always cold", "Influenced by the sea", "Extremely dry", "High altitude"], a: 1 }
-							]
-						}
-					}
+					`,
+						cards: [
+							{ front: "What is Amihan?", back: "The Northeast Monsoon bringing cool, dry air (Oct-Feb)." },
+							{ front: "What is Habagat?", back: "The Southwest Monsoon bringing warm, moist air and rain (June-Oct)." },
+							{ front: "Example of Krst Topography?", back: "Chocolate Hills (Bohol) or the Underground River (Palawan)." },
+							{ front: "What climate does PH have?", back: "Tropical Maritime Climate (warm and humid)." },
+							{ front: "Why is PH arich in life?", back: "Due to its location near the equator and warm tropical climate." }
+						],
+						quiz: [
+							{ q: "Which monsoon is characterized by cool, dry air from the Northeast?", options: ["Habagat", "Amihan", "Trade Winds", "Easterlies"], a: 1 },
+							{ q: "Which type of topography is responsible for the formation of the Chocolate Hills?", options: ["Glacial", "Volcanic", "Karst", "Desert"], a: 2 },
+							{ q: "What does 'Maritime' climate mean?", options: ["Always cold", "Influenced by the sea", "Extremely dry", "High altitude"], a: 1 }
 						]
-					},
-					extend: {
-						colors: {
-							'lagro-green': '#064e3b',
-							'lagro-emerald': '#059669',
-							'lagro-light': '#ecfdf5',
-							'lagro-accent': '#facc15'
-						},
-						fontFamily: {
-							sans: ['Inter', 'sans-serif'],
-							serif: ['Playfair Display', 'serif']
-						}
 					}
 				}
-			};
+			],
+			tailwind: {
+				extend: {
+					colors: {
+						'lagro-green': '#064e3b',
+						'lagro-emerald': '#059669',
+						'lagro-light': '#ecfdf5',
+						'lagro-accent': '#facc15'
+					},
+					fontFamily: {
+						sans: ['Inter', 'sans-serif'],
+						serif: ['Playfair Display', 'serif']
+					}
+				}
+			}
+		};
 		</script>
-
 		<!-- Local overrides (dev only) -->
 		<script src="local-override.js"></script>
 		<!-- Load centralized config (contains firebase + API placeholders) -->
@@ -128,12 +129,16 @@
 		onAuthStateChanged(auth, (user) => {
 			try { if (window.applyFirebaseUser) window.applyFirebaseUser(user); } catch(e){}
 		});
-				flashcards = generateFlashcardsFromText(extractedText);
-			 
-		              
+
  
 		async function firebaseSignUp(email, password) {
 			const cred = await createUserWithEmailAndPassword(auth, email, password);
+			return cred.user;
+		}
+
+		// email/password sign-in helper (was missing)
+		async function firebaseSignIn(email, password) {
+			const cred = await signInWithEmailAndPassword(auth, email, password);
 			return cred.user;
 		}
 
@@ -422,7 +427,14 @@
 				<h2 class="text-3xl font-serif font-bold text-lagro-green">Academic Dashboard</h2>
 				<p class="text-slate-500 mt-2">WAZUP LAGRONIANS!</p>
 			</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="subject-grid"></div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="subject-grid">
+				<!-- Fallback static subject card so dashboard shows even if JS errors occur -->		
+				<div onclick="selectSubject('career')" class="subject-card bg-white p-8 rounded-2xl border border-emerald-200 shadow-sm cursor-pointer transition flex flex-col items-center text-center">
+					<div class="w-20 h-20 rounded-2xl bg-emerald-50 flex items-center justify-center text-4xl mb-4 shadow-sm">🎓</div>
+					<h3 class="text-xl font-extrabold text-lagro-green mb-2">Life Skills</h3>
+					<p class="text-sm text-slate-500 font-medium">Higher Education Pathways, Holistic Career Dev, and Employment Types.</p>
+				</div>
+			</div>
 
 
 		</div>
@@ -1810,7 +1822,8 @@
 			}
 			if (!menu) return;
 			// Build dynamic menu depending on login state
-			if (profile && profile.email) {
+			// Treat user as signed-in if we have an email OR a Firebase uid or a non-guest name
+			if (profile && (profile.email || profile.uid || (profile.name && profile.name !== 'Guest User'))) {
 				menu.innerHTML = `
 					<div class="p-3 border-b text-sm text-slate-700">Signed in as <strong id="menu-username">${escapeHtml(profile.name)}</strong></div>
 					<button onclick="showProfilePage()" class="w-full text-left px-4 py-2 hover:bg-emerald-50">View Profile</button>
@@ -2175,31 +2188,109 @@
 		}
 
 		async function signInWithGoogleHandler() {
-			if (!window.firebaseSignInWithGoogle) return alert('Google sign-in not configured');
+			if (!window.firebaseSignInWithGoogle) {
+				// Fallback for local/dev: prompt for display name and email to simulate sign-in
+				try {
+					const name = prompt('Google sign-in is not configured.\nEnter display name to sign in locally (dev):', 'Guest User');
+					if (!name) return;
+					const email = prompt('Enter email for this local account (optional):', '');
+					const fakeUser = { uid: 'local-' + Date.now(), displayName: name, email: email || '' };
+					try { applyFirebaseUser && applyFirebaseUser(fakeUser); } catch(e) { console.warn('applyFirebaseUser failed', e); }
+					closeLoginModal();
+					try { await hydrateProfileFromFirebaseToken(); } catch(e) {}
+					try { loadProfile(); updateProfileUI(); } catch(e) {}
+					try { const pm = document.getElementById('profile-menu'); if (pm) { pm.classList.remove('hidden'); pm.style.zIndex = 7000; } } catch(e) {}
+					return;
+				} catch (err) { console.warn('local sign-in fallback failed', err); return; }
+			}
 			try {
 				const user = await window.firebaseSignInWithGoogle();
 				if (user) {
 					try { applyFirebaseUser && applyFirebaseUser(user); } catch (e) {}
 					closeLoginModal();
+					// hydrate and update UI immediately so dropdown reflects signed-in state
+					try { await hydrateProfileFromFirebaseToken(); } catch(e) { console.warn('hydrate after sign-in failed', e); }
+					try { loadProfile(); updateProfileUI(); } catch(e) {}
+					// show profile menu so user sees signed-in controls
+					try { const pm = document.getElementById('profile-menu'); if (pm) { pm.classList.remove('hidden'); pm.style.zIndex = 7000; } } catch(e) {}
 				}
 			} catch (err) {
 				console.warn('Google sign-in error', err);
-				alert('Google sign-in failed: ' + (err && err.message ? err.message : err));
+				// Detect unauthorized domain / OAuth origin errors and provide actionable instructions
+				const msg = (err && err.message) ? err.message : (err && err.toString ? err.toString() : 'Google sign-in failed');
+				if ((err && err.code === 'auth/unauthorized-domain') || /origin|unauthorized/i.test(msg)) {
+					showUnauthorizedDomainInstructions(msg);
+				} else {
+					alert('Google sign-in failed: ' + msg);
+				}
 			}
 		}
 
-		function toggleProfileMenu(e) {
+			function showUnauthorizedDomainInstructions(serverMsg) {
+				try {
+					const origin = location.origin;
+					// copy origin to clipboard for convenience
+					navigator.clipboard && navigator.clipboard.writeText(origin).catch(()=>{});
+					const instructions = `Google sign-in failed because this site origin is not authorized by your Firebase/Google OAuth configuration.\n\nSteps to fix:\n1) Open the Firebase Console (https://console.firebase.google.com) → select your project → Authentication → Sign-in method → Authorized domains. Add: ${origin}\n2) Open Google Cloud Console → APIs & Services → Credentials → select the OAuth 2.0 Client ID used by your Firebase project → add ${origin} as an "Authorized JavaScript origin" and add ${origin}/* (or the redirect URL) as an "Authorized redirect URI" if needed.\n\nYour site origin (${origin}) has been copied to clipboard for convenience.`;
+					alert(instructions);
+				} catch (e) { console.warn('showUnauthorizedDomainInstructions failed', e); alert('Google sign-in blocked due to unauthorized origin. Check Firebase/GCP console.'); }
+			}
+
+		async function toggleProfileMenu(e) {
 			e.stopPropagation();
 			// close other overlays to avoid overlap
 			try { closeAddMenu(); } catch(e){}
 			try { closeAddSubjectModal(); } catch(e){}
 			try { closeAddLessonModal(); } catch(e){}
+			// ensure profile is refreshed from storage
+			try { loadProfile(); } catch(e) { console.warn('loadProfile failed', e); }
+			// attempt to hydrate profile from Firebase ID token if available and wait for it
+			try { await hydrateProfileFromFirebaseToken(); } catch(e) { console.warn('hydrateProfileFromFirebaseToken failed', e); }
+			// rebuild profile UI so menu shows signed-in state
+			try { updateProfileUI(); } catch(e) { console.warn('updateProfileUI failed', e); }
 			const m = document.getElementById('profile-menu');
 			if (m) {
 				m.style.zIndex = 7000;
 				m.classList.toggle('hidden');
 			}
 		}
+
+		// Try to populate UI profile by calling Firebase REST accounts:lookup using the current ID token.
+		// This allows the UI to reflect a Google sign-in even when onAuthStateChanged wasn't applied earlier.
+		async function hydrateProfileFromFirebaseToken() {
+			try {
+				if (!window.getFirebaseIdToken) return;
+				const idToken = await window.getFirebaseIdToken();
+				if (!idToken) return;
+				// read apiKey from known config spots
+				const cfg = (window.getLagroFirebaseConfig && window.getLagroFirebaseConfig()) || window.__LAGRO_FIREBASE_CONFIG__ || (window.getLagroConfig && window.getLagroConfig()) || {};
+				const apiKey = cfg.apiKey || cfg.GOOGLE_API_KEY || cfg.GOOGLE_GENERATIVE_API_KEY || '';
+				if (!apiKey) return;
+				const resp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(apiKey), {
+					method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken })
+				});
+				if (!resp.ok) return;
+				const j = await resp.json().catch(()=>null);
+				if (!j || !Array.isArray(j.users) || !j.users.length) return;
+				const u = j.users[0];
+				const userObj = { uid: u.localId || u.uid || null, displayName: u.displayName || (u.email? u.email.split('@')[0] : null), email: u.email || '', providerData: u.providerUserInfo || [] };
+				if (window.applyFirebaseUser) window.applyFirebaseUser(userObj);
+			} catch (e) { console.warn('hydrateProfileFromFirebaseToken failed', e); }
+		}
+
+		// Listen for storage updates (e.g., sign-in from popup) and refresh profile UI
+		window.addEventListener('storage', (e) => {
+			if (!e || !e.key) return;
+			if (e.key === 'lagro_profile') {
+				try { loadProfile(); updateProfileUI(); } catch(err) { console.warn('storage->loadProfile failed', err); }
+			}
+		});
+
+		// When the window regains focus, attempt to hydrate from any Firebase token and refresh UI
+		window.addEventListener('focus', async () => {
+			try { await hydrateProfileFromFirebaseToken(); } catch(e) {}
+			try { loadProfile(); updateProfileUI(); } catch(e) {}
+		});
 
 		document.addEventListener('click', (e) => { try { closeAllSwipes(); } catch (err) {} const m = document.getElementById('profile-menu'); if (m) m.classList.add('hidden'); const am = document.getElementById('add-menu'); if (am) am.classList.add('hidden'); });
 		// Profile modal handlers removed
@@ -2769,7 +2860,14 @@
 			return '';
 		}
 
-		document.addEventListener('DOMContentLoaded', () => { loadProfile(); loadUserLessons(); renderSubjects(); initHeaderScroll(); adjustForHeader(); });
+		document.addEventListener('DOMContentLoaded', () => { 
+			loadProfile(); 
+			try {
+				if (typeof loadUserLessons === 'function') loadUserLessons();
+			} catch(e) { console.warn('loadUserLessons failed', e); }
+			try { renderSubjects(); } catch(e) { console.warn('renderSubjects failed', e); }
+			initHeaderScroll(); adjustForHeader(); 
+		});
 	</script>
 
 </body>
